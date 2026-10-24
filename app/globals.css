@@ -128,6 +128,13 @@ body[data-hand="right"] #score .left, body[data-hand="left"] #score .right { opa
 #countDots i.on:first-child { background: var(--accent); }
 .back-pill { position: absolute; left: 50%; bottom: calc(var(--bar-h) + 28px + var(--safe-b)); transform: translateX(-50%); box-shadow: inset 0 0 0 1px var(--glass-edge), inset 0 1.5px 0 var(--glass-hi), 0 6px 20px rgba(0, 0, 0, .25); }
 
+/* The falling notes (?view=keys): under the sheet on wide screens, instead of it on phones.
+   The keyboard stays above the floating bar. */
+.keys-pane { display: none; --keys-h: 46dvh; padding: 8px 16px calc(var(--bar-h) + 24px + var(--safe-b)); }
+body[data-view="keys"] .keys-pane { display: flex; flex: none; height: var(--keys-h); }
+body[data-view="keys"] .back-pill { bottom: calc(var(--keys-h) + 12px); }
+#keys { flex: 1; min-width: 0; width: 100%; max-width: 1240px; height: 100%; margin: 0 auto; display: block; border-radius: 12px; }
+
 
 /* ---------- Song menu: opens upward from the title in the bar ---------- */
 .menu {
@@ -307,7 +314,12 @@ input[type="range"]:focus-visible { outline: none; }
   .np { grid-area: np; }
   .side { grid-area: side; justify-content: space-between; }
   .volume { display: none; }
-  .side .icon { width: 40px; min-width: 0; flex-shrink: 1; }  /* nine tools fit a 375px phone */
+  .side .icon { flex: 1 1 0; max-width: 40px; min-width: 0; }  /* every tool fits a 375px phone */
+  /* The keys fill the pane. The sheet still renders under them (the player needs its width
+     and its MIDI), so it's hidden, never display: none. */
+  body[data-view="keys"] .scroller { position: absolute; inset: 0 var(--safe-r) 0 var(--safe-l); visibility: hidden; pointer-events: none; }
+  body[data-view="keys"] .keys-pane { flex: 1; height: auto; padding: 4px 8px calc(var(--bar-h) + 16px + var(--safe-b)); }
+  body[data-view="keys"] .back-pill { display: none; }
   .menu { width: 100%; }
   .now { width: 140px; right: calc(8px + var(--safe-r)); bottom: calc(var(--bar-h) + 20px + var(--safe-b)); }
 }

@@ -50,6 +50,7 @@ const Markup = memo(function Markup() {
         <div className="scroller" id="scroller">
           <div className="paper" id="score"></div>
         </div>
+        <div className="keys-pane"><canvas id="keys"></canvas></div>
         <button className="glass light pill back-pill" id="backToCurrent" hidden>Back to current</button>
         <div className="count" id="count" hidden aria-live="polite"><small>Loop again</small><b id="countNum"></b><span id="countDots"></span></div>
       </main>
@@ -89,6 +90,7 @@ const Markup = memo(function Markup() {
           <button className="btn icon tog" id="soundBtn" data-tog="sound"></button>
           <button className="btn icon tog" id="levelBtn" data-tog="level" hidden></button>
           <button className="btn icon tog" id="sourceBtn" data-tog="source"></button>
+          <button className="btn icon tog" id="viewBtn" data-tog="view"></button>
           <div className="volume">
             <button className="btn icon" id="mute" aria-label="Mute" title="Mute"><svg className="i-volume"><use href="#i-volume"/></svg><svg className="i-mute"><use href="#i-mute"/></svg></button>
             <input type="range" id="volume" min="0" max="1" step="0.01" defaultValue="0.8" aria-label="Volume"/>

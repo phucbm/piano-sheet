@@ -3,6 +3,7 @@
 // Ported from player.js line for line; the DOM is components/Player.tsx.
 import { type Song, baseOf, versionOf } from "@/lib/songs";
 import { type Timing, toRec as recOf, toSheet as sheetOf, slope as slopeOf } from "./timing";
+import { createKeys } from "./keys";
 
 const BASE = process.env.NEXT_PUBLIC_BASE || "";
 const media = (file: string) => `${BASE}/media/${file}`;
@@ -41,10 +42,11 @@ export function createEngine(root: HTMLElement, SONGS: Song[], navigate: (href: 
 
   // Every control's choice is kept in localStorage, so a reload comes back the same. The ones
   // that shape the song are also in the page's address, so a shared link opens the same way:
-  // ?names= ?hand= ?level= ?sound= ?speed= ?source= ?loop= ?bars=5-8. The address wins over
-  // what's kept. Volume, mute and the video card are only kept on this device.
+  // ?names= ?hand= ?level= ?sound= ?speed= ?source= ?loop= ?bars=5-8 ?view=. The address wins over
+  // what's kept. Volume, mute and the video card are only kept on this device. ?view=keys
+  // shows the falling notes.
   const STORE = "piano-sheet:settings";
-  type Saved = { speed: number; names: string; hand: string; level: string; sound: string; source: string; loop: string; volume: number; muted: boolean; video: boolean; song: string; bars: Record<string, [number, number]> };
+  type Saved = { speed: number; names: string; hand: string; level: string; sound: string; source: string; loop: string; view: string; volume: number; muted: boolean; video: boolean; song: string; bars: Record<string, [number, number]> };
   const saved: Partial<Saved> = (() => { try { return JSON.parse(localStorage.getItem(STORE) || "{}"); } catch { return {}; } })();
   const bars = saved.bars || {};  // song name -> the bar loop's bars
   // ?bars=5-8 (bars as numbered on the sheet): for the song the link opens.
@@ -59,7 +61,8 @@ export function createEngine(root: HTMLElement, SONGS: Song[], navigate: (href: 
     song: null as Song | null, xml: "", timing: null as Timing | null, duration: 0,
     speed: +(params.get("speed") || 0) || saved.speed || 1, names: params.get("names") ?? saved.names ?? "", hand: params.get("hand") ?? saved.hand ?? "",
     level: params.get("level") ?? saved.level ?? "", sound: params.get("sound") ?? saved.sound ?? "natural",
-    source: params.get("source") || saved.source || "sheet", loop: params.get("loop") ?? saved.loop ?? "", volume: saved.volume ?? 0.8, muted: !!saved.muted,
+    source: params.get("source") || saved.source || "sheet", loop: params.get("loop") ?? saved.loop ?? "",
+    view: params.get("view") || saved.view || "sheet", volume: saved.volume ?? 0.8, muted: !!saved.muted,
     playing: false, pos: 0, follow: true,
   };
   let tk: any, lastIds: string[] = [], measures: { pos: number; id: string }[] = [], currentSystem: Element | null = null, raf = 0;
@@ -70,8 +73,8 @@ export function createEngine(root: HTMLElement, SONGS: Song[], navigate: (href: 
   let barTimes: { at: number; len: number }[] = [];  // MIDI seconds of each bar
 
   function save() {
-    const { speed, names, hand, level, sound, source, loop, volume, muted } = state;
-    const data: Saved = { speed, names, hand, level, sound, source, loop, volume, muted, video: !$("now").hidden, song: state.song?.name || saved.song || "", bars };
+    const { speed, names, hand, level, sound, source, loop, view, volume, muted } = state;
+    const data: Saved = { speed, names, hand, level, sound, source, loop, view, volume, muted, video: !$("now").hidden, song: state.song?.name || saved.song || "", bars };
     try { localStorage.setItem(STORE, JSON.stringify(data)); } catch {}
     if (state.song) updateUrl();
   }
@@ -104,7 +107,7 @@ export function createEngine(root: HTMLElement, SONGS: Song[], navigate: (href: 
     scoreEl.innerHTML = svg;
     markHands();
     const loaded = () => new Promise(r => player.addEventListener("load", r, { once: true }));
-    midiReady = loaded().then(() => reshapeMidi(loaded()));
+    midiReady = loaded().then(() => { setKeyNotes(); return reshapeMidi(loaded()); });
     player.src = "data:audio/midi;base64," + tk.renderToMIDI();
     if (state.names) addNoteNames(state.names);  // needs the MIDI for the pitches
     const map = tk.renderToTimemap({ includeMeasures: true });
@@ -117,6 +120,7 @@ export function createEngine(root: HTMLElement, SONGS: Song[], navigate: (href: 
     lastIds = []; currentSystem = null;
     updateLine(state.pos, true);
     updateBar();
+    drawKeys();
   }
 
   observe(scoreEl, () => {
@@ -137,6 +141,7 @@ export function createEngine(root: HTMLElement, SONGS: Song[], navigate: (href: 
   // The top staff is the right hand, the bottom one the left (a single staff counts as right).
   function markHands() {
     handOf = new Map();
+    sheetIndex = null;
     scoreEl.querySelectorAll("g.measure").forEach(m => {
       const staves = m.querySelectorAll(":scope > g.staff");
       staves.forEach((staff, i) => {
@@ -170,19 +175,28 @@ export function createEngine(root: HTMLElement, SONGS: Song[], navigate: (href: 
     return [...ups, end + 2].sort((a, b) => a - b);
   }
 
+  // A MIDI note's note on the sheet (its id and hand), by pitch and onset: Verovio's ms are
+  // rounded, hence the margin. Built once per render, from the notes in handOf.
+  let sheetIndex: Map<number, { time: number; hand: string; id: string }[]> | null = null;
+  function sheetNote(n: any) {
+    if (!sheetIndex) {
+      const index = sheetIndex = new Map();
+      handOf.forEach((hand, id) => {
+        const { time, pitch } = tk.getMIDIValuesForElement(id);
+        (index.get(pitch) || index.set(pitch, []).get(pitch)!).push({ time, hand, id });
+      });
+    }
+    return sheetIndex.get(n.pitch)?.find(h => Math.abs(h.time - n.startTime * 1000) < 5);
+  }
+
   // The sheet writes each note only until the hand's next one and leaves the rest to the
   // pedal, which the synth doesn't play: so in the natural sound, hold every note until the
   // pedal changes or the same key is struck again. With one hand on, the other hand's
-  // notes go first. Notes are matched to their hand by pitch and onset (Verovio's ms are
-  // rounded, hence the margin), then played with a pianist's touch. Resolves once the
+  // notes go first. Notes are matched to their hand (sheetNote), then played with a
+  // pianist's touch. Resolves once the
   // player reloads.
   function reshapeMidi(reloaded: Promise<unknown>) {
-    const hands = new Map<number, { time: number; hand: string }[]>();  // pitch -> onsets in ms
-    handOf.forEach((hand, id) => {
-      const { time, pitch } = tk.getMIDIValuesForElement(id);
-      (hands.get(pitch) || hands.set(pitch, []).get(pitch)!).push({ time, hand });
-    });
-    const handOfNote = (n: any) => hands.get(n.pitch)?.find(h => Math.abs(h.time - n.startTime * 1000) < 5)?.hand;
+    const handOfNote = (n: any) => sheetNote(n)?.hand;
     const ns = player.noteSequence;
     const kept = ns.notes.filter((n: any) => !state.hand || (handOfNote(n) ?? state.hand) === state.hand);
     const notes = kept.map((n: any) => {
@@ -417,6 +431,35 @@ export function createEngine(root: HTMLElement, SONGS: Song[], navigate: (href: 
   on(scroller, "keydown", e => /Page|Home|End|Arrow(Up|Down)/.test(e.key) && setFollow(false));
   on($("backToCurrent"), "click", () => setFollow(true));
 
+  // ---------- Falling notes ----------
+
+  // The keys view (lib/player/keys.ts), drawn from the same pos the sheet lights from. Its
+  // notes come from the MIDI as Verovio wrote it (ties as one note, written lengths), before
+  // reshapeMidi holds them for the pedal; each takes its hand and name from the sheet.
+  const keys = createKeys($("keys"));
+  function setKeyNotes() {
+    keys.setSong(player.noteSequence.notes.map((n: any) => {
+      const s = sheetNote(n);
+      return {
+        pitch: n.pitch, start: n.startTime * state.speed, end: n.endTime * state.speed,
+        hand: s?.hand || "right", name: state.names && s ? noteName(s.id, state.names).text : "",
+      };
+    }), measures.map(m => m.pos));
+    drawKeys();
+  }
+  function drawKeys(pos = now()) {
+    if (state.view === "keys") keys.draw(pos, state.hand);
+  }
+  observe($("keys"), () => { keys.resize(); drawKeys(); });
+
+  // Back to the sheet: it follows the current line again.
+  function setView(view: string) {
+    state.view = view;
+    body.dataset.view = view;
+    if (view === "keys") drawKeys();
+    else { updateLine(now(), true); setFollow(true); }
+  }
+
   // ---------- Playback ----------
 
   const leader = () => state.source === "original" ? "video" : "sheet";
@@ -464,6 +507,7 @@ export function createEngine(root: HTMLElement, SONGS: Song[], navigate: (href: 
     video.pause();
     cancelAnimationFrame(raf);
     updateBar();
+    drawKeys();
   }
 
   const toggle = () => state.playing || loopWait ? pause() : play();
@@ -480,6 +524,7 @@ export function createEngine(root: HTMLElement, SONGS: Song[], navigate: (href: 
     updateLine(pos);
     if (follow) setFollow(true);
     updateBar();
+    drawKeys(pos);
   }
 
   // Back to the start of this bar (or the one before when already at its start), or on to the next.
@@ -517,6 +562,7 @@ export function createEngine(root: HTMLElement, SONGS: Song[], navigate: (href: 
     }
     updateLine(pos);
     updateBar(pos);
+    drawKeys(pos);
     raf = requestAnimationFrame(tick);
   }
 
@@ -885,6 +931,11 @@ export function createEngine(root: HTMLElement, SONGS: Song[], navigate: (href: 
       label: v => `<svg><use href="#i-${({ sheet: "note", original: "wave", both: "both" } as any)[v]}"/></svg>`,
       name: v => "Sound: " + ({ sheet: "Sheet", original: "Original", both: "Both" } as any)[v], on: v => v !== "sheet",
     },
+    view: {
+      values: ["sheet", "keys"], get: () => state.view, set: setView,
+      label: v => `<svg><use href="#i-${v}"/></svg>`,
+      name: v => "View: " + ({ sheet: "Sheet", keys: "Falling notes" } as any)[v], on: v => v === "keys",
+    },
   };
   function updateToggles() {
     root.querySelectorAll<HTMLElement>("[data-tog]").forEach(b => {
@@ -1023,6 +1074,7 @@ export function createEngine(root: HTMLElement, SONGS: Song[], navigate: (href: 
     const q = new URLSearchParams(Object.entries({
       names: state.names, hand: state.hand, level, sound: state.sound === "natural" ? "" : state.sound,
       speed: state.speed === 1 ? "" : String(state.speed), source: state.source === "sheet" ? "" : state.source, loop: state.loop,
+      view: state.view === "sheet" ? "" : state.view,
       bars: b ? (b[1] - b[0] === 1 ? `${b[1]}` : `${b[0] + 1}-${b[1]}`) : "",
     }).filter(([, v]) => v));
     return `/song/${song.name}/` + (q.size ? "?" + q : "");
@@ -1095,6 +1147,8 @@ export function createEngine(root: HTMLElement, SONGS: Song[], navigate: (href: 
       state.xml = "";
       showMeta(song);
       scoreEl.innerHTML = `<p class="score-msg">Can't load this sheet. You're offline and it hasn't been opened before.</p>`;
+      keys.setSong([], []);
+      drawKeys();
       return;
     }
     state.xml = xml;
@@ -1138,6 +1192,7 @@ export function createEngine(root: HTMLElement, SONGS: Song[], navigate: (href: 
   updateToggles();
   applyVolume();
   body.dataset.loop = state.loop;
+  body.dataset.view = state.view;
   setVideoOpen(!!saved.video);
 
   // The song the page asks for (/song/<name>/, or the old ?song=), else the last one opened,

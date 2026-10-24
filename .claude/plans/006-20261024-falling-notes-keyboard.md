@@ -1,6 +1,6 @@
 # 006: Falling notes on a piano keyboard (an extra view)
 
-Written: 2026-10-24. Status: Not started
+Written: 2026-10-24. Status: Built, not yet checked in a browser
 Related: plan 002 (the player), the easy levels (commit 394b98a).
 
 ## Goal
@@ -103,3 +103,22 @@ sheet fading that staff.
    exactly as the note sounds and the sheet lights it.
 
 ## What was built
+
+Built 2026-10-24, as planned:
+
+- `lib/player/keys.ts`: `createKeys(canvas)` → `{ setSong, resize, draw(pos, hand) }`. It handles
+  the range (snapped to white keys, at least 15 white keys), a keyboard as tall as 5.5 white-key
+  widths and at most a quarter of the canvas, 3 s of the sheet falling, guides at every C and
+  every bar line, darker bars on black keys, a glow over lit keys, and names on the bars when they fit.
+- `engine.ts`: `sheetNote(n)` is the one pitch + onset match (id and hand), now shared by
+  `reshapeMidi` and the keys and rebuilt in `markHands`. `setKeyNotes()` runs on MIDI load, before
+  the reshape. `drawKeys()` runs from `tick`, `seek`, `pause` and `render`, and a ResizeObserver
+  on the canvas. There's a `view` toggle (`setView`), kept in the store and in the URL as `?view=keys`.
+- `Player.tsx`: `.keys-pane` with `<canvas id="keys">` after the scroller, plus `#viewBtn`.
+  `Icons.tsx`: `i-sheet`, `i-keys`.
+- `globals.css`: on wide screens the pane is 46dvh under the sheet and "Back to current" sits
+  above it. On phones the pane fills the screen, the scroller is absolutely placed and
+  `visibility: hidden` (with the safe-area insets, so its width and the render don't change),
+  and the back pill is hidden. The bar icons are `flex: 1 1 0; max-width: 40px`.
+
+Check 1 (`pnpm build`) passes. Check 2 (browser) hasn't been run yet.

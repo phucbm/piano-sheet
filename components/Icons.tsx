@@ -16,6 +16,8 @@ export default function Icons() {
       <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 4v11m-4.5-4.5L12 15l4.5-4.5M5 19.5h14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none"/></symbol>
       <symbol id="i-wave" viewBox="0 0 24 24"><path d="M4 10v4M8 7v10M12 4v16M16 8v8M20 10.5v3" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" fill="none"/></symbol>
       <symbol id="i-both" viewBox="0 0 24 24"><path d="M6 15.5V5l8-1.6v10" stroke="currentColor" strokeWidth="2" fill="none"/><circle cx="4" cy="15.5" r="2.2"/><circle cx="12" cy="13.4" r="2.2"/><path d="M17 12v6M20.5 9.5v11" stroke="currentColor" strokeWidth="2" strokeLinecap="round" fill="none"/></symbol>
+      <symbol id="i-sheet" viewBox="0 0 24 24"><path d="M3 5.5h18M3 9.5h18M3 13.5h18M3 17.5h18" stroke="currentColor" strokeWidth="1.5" fill="none"/><path d="M15.5 15.5V3.5" stroke="currentColor" strokeWidth="2" fill="none"/><ellipse cx="13" cy="15.8" rx="3" ry="2.3" transform="rotate(-20 13 15.8)"/></symbol>
+      <symbol id="i-keys" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2" stroke="currentColor" strokeWidth="2" fill="none"/><path d="M7.5 12v8M12 12v8M16.5 12v8" stroke="currentColor" strokeWidth="1.6" fill="none"/><rect x="6.2" y="4" width="2.6" height="8.5" rx=".6"/><rect x="10.7" y="4" width="2.6" height="8.5" rx=".6"/><rect x="15.2" y="4" width="2.6" height="8.5" rx=".6"/></symbol>
     </svg>
   );
 }
