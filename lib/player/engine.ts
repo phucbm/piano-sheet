@@ -39,20 +39,27 @@ export function createEngine(root: HTMLElement, SONGS: Song[], navigate: (href: 
     offs.push(() => ro.disconnect());
   }
 
-  // Every control's choice is kept in localStorage, so a reload comes back the same. The page's
-  // own ?names=, ?hand=, ?level= and ?sound= (a shared link) win over what's kept.
+  // Every control's choice is kept in localStorage, so a reload comes back the same. The ones
+  // that shape the song are also in the page's address, so a shared link opens the same way:
+  // ?names= ?hand= ?level= ?sound= ?speed= ?source= ?loop= ?bars=5-8. The address wins over
+  // what's kept. Volume, mute and the video card are only kept on this device.
   const STORE = "piano-sheet:settings";
   type Saved = { speed: number; names: string; hand: string; level: string; sound: string; source: string; loop: string; volume: number; muted: boolean; video: boolean; song: string; bars: Record<string, [number, number]> };
   const saved: Partial<Saved> = (() => { try { return JSON.parse(localStorage.getItem(STORE) || "{}"); } catch { return {}; } })();
   const bars = saved.bars || {};  // song name -> the bar loop's bars
+  // ?bars=5-8 (bars as numbered on the sheet): for the song the link opens.
+  let linkBars: [number, number] | null = (() => {
+    const [a, b] = (params.get("bars") || "").split("-").map(Number);
+    return a > 0 && (b || a) >= a ? [a - 1, b || a] : null;
+  })();
 
   // Positions ("pos") are seconds of the sheet at 100% speed. The sheet's MIDI, rendered at
   // the chosen speed, runs pos / speed; the recording runs toRec(pos).
   const state = {
     song: null as Song | null, xml: "", timing: null as Timing | null, duration: 0,
-    speed: saved.speed || 1, names: params.get("names") ?? saved.names ?? "", hand: params.get("hand") ?? saved.hand ?? "",
+    speed: +(params.get("speed") || 0) || saved.speed || 1, names: params.get("names") ?? saved.names ?? "", hand: params.get("hand") ?? saved.hand ?? "",
     level: params.get("level") ?? saved.level ?? "", sound: params.get("sound") ?? saved.sound ?? "natural",
-    source: saved.source || "sheet", loop: saved.loop || "", volume: saved.volume ?? 0.8, muted: !!saved.muted,
+    source: params.get("source") || saved.source || "sheet", loop: params.get("loop") ?? saved.loop ?? "", volume: saved.volume ?? 0.8, muted: !!saved.muted,
     playing: false, pos: 0, follow: true,
   };
   let tk: any, lastIds: string[] = [], measures: { pos: number; id: string }[] = [], currentSystem: Element | null = null, raf = 0;
@@ -66,6 +73,7 @@ export function createEngine(root: HTMLElement, SONGS: Song[], navigate: (href: 
     const { speed, names, hand, level, sound, source, loop, volume, muted } = state;
     const data: Saved = { speed, names, hand, level, sound, source, loop, volume, muted, video: !$("now").hidden, song: state.song?.name || saved.song || "", bars };
     try { localStorage.setItem(STORE, JSON.stringify(data)); } catch {}
+    if (state.song) updateUrl();
   }
 
   const clamp = (v: number, lo: number, hi: number) => Math.min(Math.max(v, lo), hi);
@@ -955,10 +963,15 @@ export function createEngine(root: HTMLElement, SONGS: Song[], navigate: (href: 
   // The sheet's files: <name>.<level>.* for an easy song, <name>.* otherwise.
   const fileOf = (song: Song) => state.level ? `${song.name}.${state.level}` : song.name;
 
-  // The page for a song, keeping the note names, hand and (if not the default) level.
+  // The page for a song, keeping the controls that aren't at their default (see STORE).
   function hrefOf(song: Song) {
     const level = levelOf(song) === song.level ? "" : levelOf(song);
-    const q = new URLSearchParams(Object.entries({ names: state.names, hand: state.hand, level, sound: state.sound === "natural" ? "" : state.sound }).filter(([, v]) => v));
+    const b = state.loop === "bar" && bars[song.name];
+    const q = new URLSearchParams(Object.entries({
+      names: state.names, hand: state.hand, level, sound: state.sound === "natural" ? "" : state.sound,
+      speed: state.speed === 1 ? "" : String(state.speed), source: state.source === "sheet" ? "" : state.source, loop: state.loop,
+      bars: b ? (b[1] - b[0] === 1 ? `${b[1]}` : `${b[0] + 1}-${b[1]}`) : "",
+    }).filter(([, v]) => v));
     return `/song/${song.name}/` + (q.size ? "?" + q : "");
   }
 
@@ -1012,6 +1025,7 @@ export function createEngine(root: HTMLElement, SONGS: Song[], navigate: (href: 
     state.song = song;
     state.level = levelOf(song);
     if (!keepPos) state.pos = 0;
+    if (linkBars) { bars[song.name] = linkBars; linkBars = null; }
     loopBars = bars[song.name] || null;
     pickStart = null;
     save();
