@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Piano sheet player</title>
+<script src="https://www.verovio.org/javascript/latest/verovio-toolkit-wasm.js" defer></script>
+<script src="https://cdn.jsdelivr.net/combine/npm/tone@14.7.58,npm/@magenta/music@1.23.1/es6/core.js,npm/focus-visible@5,npm/html-midi-player@1.5.0"></script>
+<style>
+  body { font-family: system-ui, sans-serif; margin: 0; background: #fafaf7; color: #222; }
+  header { position: sticky; top: 0; z-index: 2; background: #fff; border-bottom: 1px solid #ddd;
+           padding: 10px 16px; display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: center; }
+  header h1 { font-size: 16px; margin: 0; }
+  label { font-size: 13px; display: flex; gap: 6px; align-items: center; }
+  midi-player { width: 360px; }
+  audio { height: 32px; }
+  #score { padding: 16px; max-width: 1200px; margin: auto; }
+  #score svg { width: 100%; height: auto; background: #fff; margin-bottom: 12px; }
+  g.playing, g.playing * { fill: #e8442e !important; stroke: #e8442e !important; }
+  .hint { font-size: 12px; color: #777; }
+</style>
+</head>
+<body>
+<header>
+  <h1 id="title">Loading…</h1>
+  <label>Song <select id="song"></select></label>
+  <label>Speed <select id="speed">
+    <option value="0.5">50%</option><option value="0.75">75%</option><option value="1" selected>100%</option>
+  </select></label>
+  <midi-player id="player" sound-font></midi-player>
+  <label>Original <audio id="orig" controls preload="none"></audio></label>
+  <span class="hint">Red = notes playing now. Sheet is auto-transcribed — trust your ears.</span>
+</header>
+<div id="score"></div>
+
+<script>
+// Add new songs here: output/<name>.musicxml, original recording output/<audio>.wav.
+const SONGS = [
+  { name: "vien-da-nho", audio: "vien-da-nho" },
+  { name: "vien-da-nho-easy-in-C", audio: "vien-da-nho" },
+];
+
+const songSel = document.getElementById("song");
+const speedSel = document.getElementById("speed");
+const player = document.getElementById("player");
+const scoreEl = document.getElementById("score");
+let tk, xml, lastIds = [];
+
+SONGS.forEach(s => songSel.add(new Option(s.name, s.name)));
+const params = new URLSearchParams(location.search);
+if (params.get("song")) songSel.value = params.get("song");
+
+function render() {
+  tk.setOptions({
+    pageWidth: Math.min(scoreEl.clientWidth, 1200) * 100 / 45,
+    scale: 45, adjustPageHeight: true, breaks: "auto",
+    midiTempoAdjustment: Number(speedSel.value),
+  });
+  tk.loadData(xml);
+  let svg = "";
+  for (let p = 1; p <= tk.getPageCount(); p++) svg += tk.renderToSVG(p);
+  scoreEl.innerHTML = svg;
+  player.src = "data:audio/midi;base64," + tk.renderToMIDI();
+}
+
+async function load() {
+  const name = songSel.value;
+  history.replaceState(null, "", "?song=" + name);
+  xml = await (await fetch(`output/${name}.musicxml`)).text();
+  const song = SONGS.find(s => s.name === name);
+  document.getElementById("orig").src = `output/${song.audio}.wav`;
+  render();
+  document.getElementById("title").textContent = name;
+}
+
+player.addEventListener("note", e => {
+  // Verovio's timemap is in ms at the rendered tempo.
+  const ids = tk.getElementsAtTime(e.detail.note.startTime * 1000).notes || [];
+  lastIds.forEach(id => document.getElementById(id)?.classList.remove("playing"));
+  ids.forEach(id => document.getElementById(id)?.classList.add("playing"));
+  if (ids[0]) document.getElementById(ids[0])?.scrollIntoView({ block: "center", behavior: "smooth" });
+  lastIds = ids;
+});
+player.addEventListener("stop", () => {
+  lastIds.forEach(id => document.getElementById(id)?.classList.remove("playing"));
+  lastIds = [];
+});
+
+songSel.addEventListener("change", load);
+speedSel.addEventListener("change", render);
+
+document.addEventListener("DOMContentLoaded", () => {
+  verovio.module.onRuntimeInitialized = () => {
+    tk = new verovio.toolkit();
+    load();
+  };
+});
+</script>
+</body>
+</html>

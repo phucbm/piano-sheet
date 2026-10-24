@@ -1,0 +1,7 @@
+.venv/
+models/
+input/
+output/*.wav
+output/*.svg
+__pycache__/
+.DS_Store
