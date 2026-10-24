@@ -16,7 +16,10 @@
   audio { height: 32px; }
   #score { padding: 16px; max-width: 1200px; margin: auto; }
   #score svg { width: 100%; height: auto; background: #fff; margin-bottom: 12px; }
+  #score svg svg { overflow: visible; }
   g.playing, g.playing * { fill: #e8442e !important; stroke: #e8442e !important; }
+  text.note-name { fill: #2a6fb0; font-family: system-ui, sans-serif; }
+  text.note-name.playing { fill: #e8442e; font-weight: bold; }
   .hint { font-size: 12px; color: #777; }
 </style>
 </head>
@@ -26,6 +29,9 @@
   <label>Song <select id="song"></select></label>
   <label>Speed <select id="speed">
     <option value="0.5">50%</option><option value="0.75">75%</option><option value="1" selected>100%</option>
+  </select></label>
+  <label>Note names <select id="names">
+    <option value="">Off</option><option value="letter">C D E</option><option value="solfege">Do Re Mi</option>
   </select></label>
   <midi-player id="player" sound-font></midi-player>
   <label>Original <audio id="orig" controls preload="none"></audio></label>
@@ -42,6 +48,7 @@ const SONGS = [
 
 const songSel = document.getElementById("song");
 const speedSel = document.getElementById("speed");
+const namesSel = document.getElementById("names");
 const player = document.getElementById("player");
 const scoreEl = document.getElementById("score");
 let tk, xml, lastIds = [];
@@ -49,6 +56,7 @@ let tk, xml, lastIds = [];
 SONGS.forEach(s => songSel.add(new Option(s.name, s.name)));
 const params = new URLSearchParams(location.search);
 if (params.get("song")) songSel.value = params.get("song");
+if (params.get("names")) namesSel.value = params.get("names");
 
 function render() {
   tk.setOptions({
@@ -61,11 +69,138 @@ function render() {
   for (let p = 1; p <= tk.getPageCount(); p++) svg += tk.renderToSVG(p);
   scoreEl.innerHTML = svg;
   player.src = "data:audio/midi;base64," + tk.renderToMIDI();
+  if (namesSel.value) addNoteNames(namesSel.value);  // needs the MIDI for the pitches
+}
+
+const STEPS = { c: 0, d: 2, e: 4, f: 5, g: 7, a: 9, b: 11 };
+const SOLFEGE = { c: "Do", d: "Re", e: "Mi", f: "Fa", g: "Sol", a: "La", b: "Si" };
+
+// The written letter comes from the note; the sharp/flat from how far the sounding
+// pitch is from that letter, so key signatures and earlier accidentals count.
+function noteName(id, style) {
+  const { pname, oct } = tk.getElementAttr(id);
+  const pitch = tk.getMIDIValuesForElement(id).pitch;
+  const acc = { "-2": "𝄫", "-1": "♭", 1: "♯", 2: "𝄪" }[pitch - 12 * (+oct + 1) - STEPS[pname]] || "";
+  return { pitch, text: (style === "solfege" ? SOLFEGE[pname] : pname.toUpperCase()) + acc };
+}
+
+// Study mode: each note's name above the top staff and below the bottom one (single
+// staff: below), chords stacked highest on top. Chord symbols and tempo move up above
+// the names, and the lines of music below move down to make room. Labels carry
+// data-note so the player can light them up.
+function addNoteNames(style) {
+  scoreEl.querySelectorAll("svg.definition-scale").forEach(page => {
+    let shift = 0, prevBottom = -Infinity;
+    page.querySelectorAll("g.system").forEach(system => {
+      const before = system.getBBox();
+      const space = labelSystem(system, style);
+      const after = system.getBBox();
+      shift = Math.max(shift, before.y - after.y, prevBottom + space * 2 - after.y);
+      system.setAttribute("transform", `translate(0, ${shift})`);
+      prevBottom = after.y + after.height + shift;
+    });
+    // Grow the page to fit the moved lines.
+    const vb = page.viewBox.baseVal;
+    const margin = page.querySelector("g.page-margin").transform.baseVal[0]?.matrix.f || 0;
+    const height = Math.max(vb.height, prevBottom + margin * 2);
+    const outer = page.parentNode;
+    outer.setAttribute("height", outer.height.baseVal.value * height / vb.height + "px");
+    page.setAttribute("viewBox", `${vb.x} ${vb.y} ${vb.width} ${height}`);
+  });
+}
+
+const LIFTED = "harm, tempo, dir, dynam, reh";  // text that sits above the top staff
+
+function labelSystem(system, style) {
+  const SVG = "http://www.w3.org/2000/svg";
+  const measures = [...system.querySelectorAll("g.measure")];
+  const staves = measures.map(m => [...m.querySelectorAll(":scope > g.staff")]);
+  const lineYs = staff => [...staff.querySelectorAll(":scope > path")].map(p => p.getBBox().y);
+  const ys = lineYs(staves[0][0]);
+  const space = (Math.max(...ys) - Math.min(...ys)) / (ys.length - 1);
+  const size = space * 1.4, gap = space * 0.6;
+  const twoSided = staves[0].length > 1;
+
+  // One label row edge per side for the whole line, clear of notes, stems, slurs and ties.
+  const curves = measures.flatMap(m => [...m.querySelectorAll(":scope > g.slur, :scope > g.tie")])
+    .map(c => c.getBBox());
+  const topLine = Math.min(...staves.map(s => Math.min(...lineYs(s[0]))));
+  const bottomLine = Math.max(...staves.map(s => Math.max(...lineYs(s.at(-1)))));
+  const top = Math.min(...staves.map(s => s[0].getBBox().y),
+                       ...curves.filter(b => b.y < topLine).map(b => b.y)) - gap;
+  const bottom = Math.max(...staves.map(s => { const b = s.at(-1).getBBox(); return b.y + b.height; }),
+                          ...curves.filter(b => b.y + b.height > bottomLine).map(b => b.y + b.height)) + gap;
+
+  let labelsTop = top;
+  const rowsAbove = [], rowsBelow = [];  // per row, the x spans taken by names
+  staves.forEach(measureStaves => measureStaves.forEach((staff, si) => {
+    const above = twoSided && si === 0;
+    if (!above && si !== measureStaves.length - 1) return;
+    const notes = [...staff.querySelectorAll("g.note")].map(n => {
+      const head = (n.querySelector("g.notehead") || n).getBBox();
+      return { id: n.id, x: head.x + head.width / 2, ...noteName(n.id, style) };
+    }).sort((a, b) => a.x - b.x);
+    const columns = [];
+    notes.forEach(n => {
+      const col = columns.at(-1);
+      if (col && n.x - col[0].x < space) col.push(n); else columns.push([n]);
+    });
+    columns.forEach(col => {
+      col.sort((a, b) => b.pitch - a.pitch);
+      const texts = col.map(n => {
+        const t = document.createElementNS(SVG, "text");
+        Object.entries({ x: col[0].x, "font-size": size, "text-anchor": "middle",
+                         class: "note-name", "data-note": n.id })
+          .forEach(([k, v]) => t.setAttribute(k, v));
+        t.textContent = n.text;
+        staff.parentNode.appendChild(t);
+        const half = t.getComputedTextLength() / 2 + size * 0.15;
+        return { t, from: col[0].x - half, to: col[0].x + half };
+      });
+      // Row 0 hugs the staff. A column that would touch a neighbour's names moves out a row.
+      const rows = above ? rowsAbove : rowsBelow;
+      const rowOf = i => above ? col.length - 1 - i : i;
+      const free = k => texts.every((l, i) =>
+        !(rows[k + rowOf(i)] || []).some(([from, to]) => l.from < to && from < l.to));
+      let k = 0;
+      while (!free(k)) k++;
+      texts.forEach((l, i) => {
+        const row = k + rowOf(i);
+        (rows[row] ||= []).push([l.from, l.to]);
+        // Baselines: above, a name sits on its row; below, it hangs from it.
+        const y = above ? top - row * size : bottom + (row + 0.8) * size;
+        if (above) labelsTop = Math.min(labelsTop, y - size * 0.8);
+        l.t.setAttribute("y", y);
+      });
+    });
+  }));
+
+  if (twoSided) {
+    const lifted = measures.flatMap(m => [...m.querySelectorAll(LIFTED.split(", ").map(c => `:scope > g.${c}`).join())])
+      .filter(el => { const b = el.getBBox(); return b.height && b.y < topLine; });
+    const lowest = Math.max(...lifted.map(el => { const b = el.getBBox(); return b.y + b.height; }));
+    const up = lowest - (labelsTop - gap);
+    if (up > 0) lifted.forEach(el => el.setAttribute("transform", `translate(0, ${-up})`));
+  }
+  return space;
+}
+
+function light(ids, on) {
+  ids.forEach(id => {
+    document.getElementById(id)?.classList.toggle("playing", on);
+    scoreEl.querySelector(`[data-note="${id}"]`)?.classList.toggle("playing", on);
+  });
+}
+
+function updateUrl() {
+  const q = new URLSearchParams({ song: songSel.value });
+  if (namesSel.value) q.set("names", namesSel.value);
+  history.replaceState(null, "", "?" + q);
 }
 
 async function load() {
   const name = songSel.value;
-  history.replaceState(null, "", "?song=" + name);
+  updateUrl();
   xml = await (await fetch(`output/${name}.musicxml`)).text();
   const song = SONGS.find(s => s.name === name);
   document.getElementById("orig").src = `output/${song.audio}.wav`;
@@ -77,18 +212,19 @@ player.addEventListener("note", e => {
   // Verovio's timemap is in ms at the rendered tempo, rounded to whole ms; look a little
   // past the onset so a note starting at 1384.6 ms (stored as 1385) isn't skipped.
   const ids = tk.getElementsAtTime(Math.round(e.detail.note.startTime * 1000) + 10).notes || [];
-  lastIds.forEach(id => document.getElementById(id)?.classList.remove("playing"));
-  ids.forEach(id => document.getElementById(id)?.classList.add("playing"));
+  light(lastIds, false);
+  light(ids, true);
   if (ids[0]) document.getElementById(ids[0])?.scrollIntoView({ block: "center", behavior: "smooth" });
   lastIds = ids;
 });
 player.addEventListener("stop", () => {
-  lastIds.forEach(id => document.getElementById(id)?.classList.remove("playing"));
+  light(lastIds, false);
   lastIds = [];
 });
 
 songSel.addEventListener("change", load);
 speedSel.addEventListener("change", render);
+namesSel.addEventListener("change", () => { updateUrl(); render(); });
 
 document.addEventListener("DOMContentLoaded", () => {
   verovio.module.onRuntimeInitialized = () => {
