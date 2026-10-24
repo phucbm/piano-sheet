@@ -74,8 +74,9 @@ async function load() {
 }
 
 player.addEventListener("note", e => {
-  // Verovio's timemap is in ms at the rendered tempo.
-  const ids = tk.getElementsAtTime(e.detail.note.startTime * 1000).notes || [];
+  // Verovio's timemap is in ms at the rendered tempo, rounded to whole ms; look a little
+  // past the onset so a note starting at 1384.6 ms (stored as 1385) isn't skipped.
+  const ids = tk.getElementsAtTime(Math.round(e.detail.note.startTime * 1000) + 10).notes || [];
   lastIds.forEach(id => document.getElementById(id)?.classList.remove("playing"));
   ids.forEach(id => document.getElementById(id)?.classList.add("playing"));
   if (ids[0]) document.getElementById(ids[0])?.scrollIntoView({ block: "center", behavior: "smooth" });
