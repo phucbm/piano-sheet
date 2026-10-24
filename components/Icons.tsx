@@ -13,6 +13,7 @@ export default function Icons() {
       <symbol id="i-volume" viewBox="0 0 24 24"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4Z"/><path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11" stroke="currentColor" strokeWidth="2" strokeLinecap="round" fill="none"/></symbol>
       <symbol id="i-mute" viewBox="0 0 24 24"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4Z"/><path d="m16 9.5 5 5m0-5-5 5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" fill="none"/></symbol>
       <symbol id="i-note" viewBox="0 0 24 24"><path d="M9 17.5V6l10-2v11.5" stroke="currentColor" strokeWidth="2" fill="none"/><circle cx="6.5" cy="17.5" r="2.5"/><circle cx="16.5" cy="15.5" r="2.5"/></symbol>
+      <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 4v11m-4.5-4.5L12 15l4.5-4.5M5 19.5h14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none"/></symbol>
       <symbol id="i-wave" viewBox="0 0 24 24"><path d="M4 10v4M8 7v10M12 4v16M16 8v8M20 10.5v3" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" fill="none"/></symbol>
       <symbol id="i-both" viewBox="0 0 24 24"><path d="M6 15.5V5l8-1.6v10" stroke="currentColor" strokeWidth="2" fill="none"/><circle cx="4" cy="15.5" r="2.2"/><circle cx="12" cy="13.4" r="2.2"/><path d="M17 12v6M20.5 9.5v11" stroke="currentColor" strokeWidth="2" strokeLinecap="round" fill="none"/></symbol>
     </svg>

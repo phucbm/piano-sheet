@@ -93,6 +93,7 @@ const Markup = memo(function Markup() {
             <button className="btn icon" id="mute" aria-label="Mute" title="Mute"><svg className="i-volume"><use href="#i-volume"/></svg><svg className="i-mute"><use href="#i-mute"/></svg></button>
             <input type="range" id="volume" min="0" max="1" step="0.01" defaultValue="0.8" aria-label="Volume"/>
           </div>
+          <button className="btn icon" id="downloadBtn" aria-label="Download the sheet" title="Download the sheet as an image"><svg><use href="#i-download"/></svg></button>
           <button className="btn icon tog" id="videoBtn" aria-label="Video" title="Show / hide the video"><svg><use href="#i-video"/></svg></button>
         </div>
         <div className="menu" id="songMenu" hidden>

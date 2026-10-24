@@ -955,6 +955,59 @@ export function createEngine(root: HTMLElement, SONGS: Song[], navigate: (href: 
     on(window, "resize", () => Object.assign(card.style, { left: "", top: "", right: "", bottom: "" }));
   })();
 
+  // ---------- Download ----------
+
+  // The whole sheet as one PNG, laid out as it is now (note names included), with the title
+  // and meta on top, and under them where it was made. The playing, loop and hand highlights are page CSS, so they stay out.
+  async function downloadSheet() {
+    const pages = [...scoreEl.querySelectorAll<SVGSVGElement>(":scope > svg")];
+    if (!state.song || !pages.length) return toast("No sheet to download");
+    const imgs = await Promise.all(pages.map(async page => {
+      const { width, height } = page.getBoundingClientRect();
+      const svg = page.cloneNode(true) as SVGSVGElement;
+      svg.querySelectorAll("rect.bar-hit").forEach(h => h.remove());
+      svg.querySelectorAll("text.note-name").forEach(t => { t.setAttribute("fill", "#2a6fb0"); t.setAttribute("font-family", "system-ui, sans-serif"); });
+      svg.setAttribute("width", String(width));
+      svg.setAttribute("height", String(height));
+      const url = URL.createObjectURL(new Blob([new XMLSerializer().serializeToString(svg)], { type: "image/svg+xml" }));
+      const img = new Image();
+      img.src = url;
+      try { await img.decode(); } finally { URL.revokeObjectURL(url); }
+      return { img, width, height };
+    }));
+    const pad = 24, head = 84;
+    const w = Math.max(...imgs.map(i => i.width)) + pad * 2;
+    const h = imgs.reduce((sum, i) => sum + i.height, 0) + head + pad;
+    // Sharp at 2×, but within what phones allow for one canvas (about 16M pixels).
+    const k = Math.min(2, Math.sqrt(16e6 / (w * h)), 32000 / h);
+    const c = document.createElement("canvas");
+    c.width = Math.round(w * k); c.height = Math.round(h * k);
+    const ctx = c.getContext("2d")!;
+    ctx.scale(k, k);
+    ctx.fillStyle = "#fff";
+    ctx.fillRect(0, 0, w, h);
+    ctx.fillStyle = "#111";
+    ctx.font = "800 20px system-ui, sans-serif";
+    ctx.fillText($("title").textContent, pad, pad + 16);
+    ctx.fillStyle = "#666";
+    ctx.font = "600 13px system-ui, sans-serif";
+    ctx.fillText($("meta").textContent, pad, pad + 36);
+    ctx.fillStyle = "#999";
+    ctx.font = "600 12px system-ui, sans-serif";
+    ctx.fillText("Arranged with Piano Sheet · phucbm.github.io/piano-sheet", pad, pad + 54);
+    let y = head;
+    imgs.forEach(i => { ctx.drawImage(i.img, pad, y, i.width, i.height); y += i.height; });
+    const blob = await new Promise<Blob | null>(r => c.toBlob(r, "image/png"));
+    if (!blob) return toast("Couldn't make the image");
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `${fileOf(state.song)}.png`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+    toast("Sheet downloaded");
+  }
+  on($("downloadBtn"), "click", () => downloadSheet().catch(() => toast("Couldn't make the image")));
+
   // ---------- Songs ----------
 
   // An easy song's level: the one asked for if it has it, else its default. "" for other songs.
