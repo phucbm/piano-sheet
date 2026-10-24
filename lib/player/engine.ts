@@ -43,10 +43,10 @@ export function createEngine(root: HTMLElement, SONGS: Song[], navigate: (href: 
   // Every control's choice is kept in localStorage, so a reload comes back the same. The ones
   // that shape the song are also in the page's address, so a shared link opens the same way:
   // ?names= ?hand= ?level= ?sound= ?speed= ?source= ?loop= ?bars=5-8 ?view=. The address wins over
-  // what's kept. Volume, mute and the video card are only kept on this device. ?view=keys
+  // what's kept. Volume, mute, the video card and the bar's mode are only kept on this device. ?view=keys
   // shows the falling notes.
   const STORE = "piano-sheet:settings";
-  type Saved = { speed: number; names: string; hand: string; level: string; sound: string; source: string; loop: string; view: string; volume: number; muted: boolean; video: boolean; song: string; bars: Record<string, [number, number]> };
+  type Saved = { speed: number; names: string; hand: string; level: string; sound: string; source: string; loop: string; view: string; volume: number; muted: boolean; video: boolean; mode: string; song: string; bars: Record<string, [number, number]> };
   const saved: Partial<Saved> = (() => { try { return JSON.parse(localStorage.getItem(STORE) || "{}"); } catch { return {}; } })();
   const bars = saved.bars || {};  // song name -> the bar loop's bars
   // ?bars=5-8 (bars as numbered on the sheet): for the song the link opens.
@@ -65,6 +65,7 @@ export function createEngine(root: HTMLElement, SONGS: Song[], navigate: (href: 
     view: params.get("view") || saved.view || "sheet", volume: saved.volume ?? 0.8, muted: !!saved.muted,
     playing: false, pos: 0, follow: true,
   };
+  let mode = "bar";  // the bar's mode: "bar", "max" or "mini" (see Bar modes)
   let tk: any, lastIds: string[] = [], measures: { pos: number; id: string }[] = [], currentSystem: Element | null = null, raf = 0;
   let anchor = { pos: 0, at: 0 };  // while the sheet plays: pos at a moment (performance.now())
   let midiReady: Promise<unknown> = Promise.resolve();
@@ -74,7 +75,7 @@ export function createEngine(root: HTMLElement, SONGS: Song[], navigate: (href: 
 
   function save() {
     const { speed, names, hand, level, sound, source, loop, view, volume, muted } = state;
-    const data: Saved = { speed, names, hand, level, sound, source, loop, view, volume, muted, video: !$("now").hidden, song: state.song?.name || saved.song || "", bars };
+    const data: Saved = { speed, names, hand, level, sound, source, loop, view, volume, muted, video: !$("now").hidden, mode, song: state.song?.name || saved.song || "", bars };
     try { localStorage.setItem(STORE, JSON.stringify(data)); } catch {}
     if (state.song) updateUrl();
   }
@@ -851,7 +852,7 @@ export function createEngine(root: HTMLElement, SONGS: Song[], navigate: (href: 
     return (a / (2 * Math.PI) + 1) % 1;
   }
   on(ringEl, "pointerdown", e => {
-    if (e.target.closest("#play") || !state.duration) return;
+    if (e.target.closest("#play") || !state.duration || mode === "mini") return;
     seeking = true;
     ringEl.setPointerCapture(e.pointerId);
     ringEl.classList.add("dragging");
@@ -894,44 +895,52 @@ export function createEngine(root: HTMLElement, SONGS: Song[], navigate: (href: 
   const LEVELS: Record<string, string> = {  // same as LEVELS in scripts/to_sheet.py
     root: "root notes", fifth: "root + fifth", broken: "broken 1-5-8-5", ballad: "ballad 1-5-8-10",
   };
-  type Toggle = { values: any[]; get: () => any; set: (v: any) => void; label: (v: any) => string; name: (v: any) => string; on: (v: any) => boolean };
+  type Toggle = { cap: string; values: any[]; get: () => any; set: (v: any) => void; label: (v: any) => string; name: (v: any) => string; on: (v: any) => boolean };
   const TOGGLES: Record<string, Toggle> = {
     speed: {
+      cap: "Speed",
       values: [1, 0.75, 0.5, 1.25, 1.5], get: () => state.speed, set: setSpeed,
       label: v => `${String(v).replace(/^0/, "")}×`, name: v => `Speed ${v * 100}%`, on: v => v !== 1,
     },
     names: {
+      cap: "Names",
       values: ["", "letter", "solfege"], get: () => state.names, set: setNames,
       label: v => ({ "": "Aa", letter: "CDE", solfege: "Do" } as any)[v],
       name: v => "Note names " + ({ "": "off", letter: "C D E", solfege: "Do Re Mi" } as any)[v], on: v => !!v,
     },
     hand: {
+      cap: "Hands",
       values: ["", "right", "left"], get: () => state.hand, set: setHand,
       label: v => ({ "": "LR", right: "R", left: "L" } as any)[v],
       name: v => ({ "": "Both hands", right: "Right hand only", left: "Left hand only" } as any)[v], on: v => !!v,
     },
     sound: {
+      cap: "Tone",
       values: ["natural", "raw"], get: () => state.sound, set: setSound,
       label: v => ({ natural: "Nat", raw: "Raw" } as any)[v],
       name: v => ({ natural: "Natural: pedal, dynamics, room", raw: "Raw: every note exact" } as any)[v], on: v => v !== "natural",
     },
     level: {
+      cap: "Level",
       get values() { return state.song?.levels || []; }, get: () => state.level, set: setLevel,
       label: v => `L${(state.song?.levels || []).indexOf(v) + 1}`,
       name: v => `Level ${(state.song?.levels || []).indexOf(v) + 1}: left hand ` + (LEVELS[v] || v),
       on: v => v !== state.song?.level,
     },
     loop: {
+      cap: "Loop",
       values: ["", "all", "row", "bar"], get: () => state.loop, set: setLoop,
       label: v => `<svg><use href="#i-loop"/></svg>` + (v === "row" || v === "bar" ? `<span class="tog-badge">${v}</span>` : ""),
       name: v => "Loop " + ({ "": "off", all: "the whole song", row: "this row", bar: "bars: tap the bar to start from" } as any)[v], on: v => !!v,
     },
     source: {
+      cap: "Sound",
       values: ["sheet", "original", "both"], get: () => state.source, set: setSource,
       label: v => `<svg><use href="#i-${({ sheet: "note", original: "wave", both: "both" } as any)[v]}"/></svg>`,
       name: v => "Sound: " + ({ sheet: "Sheet", original: "Original", both: "Both" } as any)[v], on: v => v !== "sheet",
     },
     view: {
+      cap: "View",
       values: ["sheet", "keys"], get: () => state.view, set: setView,
       label: v => `<svg><use href="#i-${v}"/></svg>`,
       name: v => "View: " + ({ sheet: "Sheet", keys: "Falling notes" } as any)[v], on: v => v === "keys",
@@ -940,7 +949,7 @@ export function createEngine(root: HTMLElement, SONGS: Song[], navigate: (href: 
   function updateToggles() {
     root.querySelectorAll<HTMLElement>("[data-tog]").forEach(b => {
       const t = TOGGLES[b.dataset.tog!], v = t.get();
-      b.innerHTML = t.label(v);
+      b.innerHTML = t.label(v) + `<span class="cap">${t.cap}</span>`;
       b.title = t.name(v);
       b.setAttribute("aria-label", t.name(v));
       b.setAttribute("aria-pressed", String(t.on(v)));
@@ -963,7 +972,9 @@ export function createEngine(root: HTMLElement, SONGS: Song[], navigate: (href: 
   }));
 
   // The bar's height places the video card and "Back to current" above it.
-  observe($("bar"), () => document.documentElement.style.setProperty("--bar-h", $("bar").offsetHeight + "px"));
+  // Folded into the disc, it floats free and the sheet and keys take the space.
+  // The panel (max) covers the sheet for a moment, so it keeps the bar's.
+  observe($("bar"), () => mode !== "max" && document.documentElement.style.setProperty("--bar-h", (mode === "mini" ? 0 : $("bar").offsetHeight) + "px"));
 
   // ---------- Song menu and video ----------
 
@@ -972,7 +983,7 @@ export function createEngine(root: HTMLElement, SONGS: Song[], navigate: (href: 
     $("songMenu").hidden = !open;
     $("songBtn").setAttribute("aria-expanded", String(open));
   }
-  function closeOverlays() { setMenu(false); }
+  function closeOverlays() { setMenu(false); if (mode === "max") setMode("bar"); }
   on($("songBtn"), "click", () => setMenu($("songMenu").hidden));
   on(document, "pointerdown", e => !$("songMenu").hidden && !e.target.closest("#songMenu, #songBtn") && setMenu(false));
 
@@ -984,6 +995,15 @@ export function createEngine(root: HTMLElement, SONGS: Song[], navigate: (href: 
   on($("videoBtn"), "click", () => { setVideoOpen($("now").hidden); toast($("now").hidden ? "Video off" : "Video on"); });
   on($("nowClose"), "click", () => setVideoOpen(false));
 
+  // The safe areas (--safe-* in globals.css): keep what's dragged off the notch and home bar.
+  const safe = (side: string) => parseFloat(getComputedStyle(document.documentElement).getPropertyValue(`--safe-${side}`)) || 0;
+  const dragTo = (el: HTMLElement, x: number, y: number) => Object.assign(el.style, {
+    left: clamp(x, 8 + safe("l"), innerWidth - el.offsetWidth - 8 - safe("r")) + "px",
+    top: clamp(y, 8 + safe("t"), innerHeight - el.offsetHeight - 8 - safe("b")) + "px",
+    right: "auto", bottom: "auto",
+  });
+  const undrag = (el: HTMLElement) => Object.assign(el.style, { left: "", top: "", right: "", bottom: "" });
+
   // Drag the video card anywhere; it goes back to its corner when the window resizes.
   (() => {
     const card = $("now");
@@ -994,17 +1014,82 @@ export function createEngine(root: HTMLElement, SONGS: Song[], navigate: (href: 
       start = { x: e.clientX - r.left, y: e.clientY - r.top };
       card.setPointerCapture(e.pointerId);
     });
-    // The safe areas (--safe-* in globals.css): keep the card off the notch and home bar.
-    const safe = (side: string) => parseFloat(getComputedStyle(document.documentElement).getPropertyValue(`--safe-${side}`)) || 0;
-    on(card, "pointermove", e => {
-      if (!start) return;
-      const x = clamp(e.clientX - start.x, 8 + safe("l"), innerWidth - card.offsetWidth - 8 - safe("r"));
-      const y = clamp(e.clientY - start.y, 8 + safe("t"), innerHeight - card.offsetHeight - 8 - safe("b"));
-      Object.assign(card.style, { left: x + "px", top: y + "px", right: "auto", bottom: "auto" });
-    });
+    on(card, "pointermove", e => start && dragTo(card, e.clientX - start.x, e.clientY - start.y));
     on(card, "pointerup", () => start = null);
-    on(window, "resize", () => Object.assign(card.style, { left: "", top: "", right: "", bottom: "" }));
+    on(window, "resize", () => undrag(card));
   })();
+
+  // ---------- Bar modes ----------
+
+  // "bar": the controls in a row, as many as the screen fits (globals.css); "max": a panel with
+  // every control and its name; "mini": just the disc, a tap still plays and pauses, a drag
+  // moves it anywhere, the badge on it opens the bar again. It goes back to its corner when the
+  // window resizes. Switching is a view transition: the disc and each control glide to where
+  // they go, the rest fades.
+  const still = matchMedia("(prefers-reduced-motion: reduce)");
+  function setMode(next: string, animate = true) {
+    if (next === mode) return;
+    const bar: HTMLElement = $("bar");
+    const apply = () => {
+      mode = next;
+      body.classList.toggle("max", mode === "max");
+      body.classList.toggle("mini", mode === "mini");
+      undrag(bar);
+      $("maxBtn").setAttribute("aria-label", mode === "max" ? "Fewer controls" : "All controls");
+      $("maxBtn").title = $("maxBtn").getAttribute("aria-label");
+      save();
+    };
+    setMenu(false);
+    if (!animate || still.matches || !document.startViewTransition) return apply();
+    const named = [bar, ...bar.querySelectorAll<HTMLElement>("#ring, .np, .side > *, .modes > *, #growBtn")];
+    named.forEach(el => el.style.viewTransitionName = "bar-" + (el.id || el.className.split(" ")[0]));
+    document.startViewTransition(apply).finished.finally(() => named.forEach(el => el.style.viewTransitionName = ""));
+  }
+  on($("maxBtn"), "click", () => setMode(mode === "max" ? "bar" : "max"));
+  on($("miniBtn"), "click", () => { setMode("mini"); $("growBtn").focus(); });
+  on($("growBtn"), "click", () => { setMode("bar"); $("miniBtn").focus(); });
+  (() => {
+    const bar = $("bar");
+    let start: { x: number; y: number; dx: number; dy: number } | null = null, moved = false;
+    on(bar, "pointerdown", e => {
+      moved = false;
+      if (mode !== "mini" || e.target.closest("#growBtn")) return;
+      const r = bar.getBoundingClientRect();
+      start = { x: e.clientX, y: e.clientY, dx: e.clientX - r.left, dy: e.clientY - r.top };
+    });
+    // A few pixels of slack, so a tap on the disc stays play/pause.
+    on(bar, "pointermove", e => {
+      if (!start) return;
+      if (!moved) {
+        if (Math.hypot(e.clientX - start.x, e.clientY - start.y) < 6) return;
+        moved = true;
+        bar.setPointerCapture(e.pointerId);
+      }
+      dragTo(bar, e.clientX - start.dx, e.clientY - start.dy);
+    });
+    on(bar, "pointerup", () => start = null);
+    on(bar, "pointercancel", () => start = null);
+    on(bar, "click", e => moved && (e.stopPropagation(), e.preventDefault(), moved = false), { capture: true });
+    on(window, "resize", () => undrag(bar));
+  })();
+
+  // ---------- Reload ----------
+
+  // The installed app has no reload of its own. Fetch a new service worker first and let it
+  // take over (it skips waiting), so the reload comes back as the newest version.
+  on($("reloadBtn"), "click", async () => {
+    toast("Reloading…");
+    try {
+      const reg = await navigator.serviceWorker?.getRegistration();
+      await reg?.update();
+      const sw = reg?.installing;
+      if (sw) await new Promise(done => {
+        sw.addEventListener("statechange", () => /activated|redundant/.test(sw.state) && done(0));
+        setTimeout(done, 8000);
+      });
+    } catch {}
+    location.reload();
+  });
 
   // ---------- Download ----------
 
@@ -1194,6 +1279,7 @@ export function createEngine(root: HTMLElement, SONGS: Song[], navigate: (href: 
   body.dataset.loop = state.loop;
   body.dataset.view = state.view;
   setVideoOpen(!!saved.video);
+  if (saved.mode === "mini") setMode("mini", false);
 
   // The song the page asks for (/song/<name>/, or the old ?song=), else the last one opened,
   // else the first one.

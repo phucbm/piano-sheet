@@ -81,26 +81,32 @@ const Markup = memo(function Markup() {
           <small className="np-time"><span id="timeNow">0:00</span> / <span id="timeEnd">0:00</span></small>
         </div>
         <div className="side">
-          <button className="btn icon" id="prevBar" aria-label="Back one bar" title="Back one bar (←)"><svg><use href="#i-prev"/></svg></button>
-          <button className="btn icon" id="nextBar" aria-label="Forward one bar" title="Forward one bar (→)"><svg><use href="#i-next"/></svg></button>
+          {/* .more: left out of the bar on a tablet (the panel still has them). */}
+          <button className="btn icon" id="prevBar" aria-label="Back one bar" title="Back one bar (←)"><svg><use href="#i-prev"/></svg><span className="cap">Back a bar</span></button>
+          <button className="btn icon" id="nextBar" aria-label="Forward one bar" title="Forward one bar (→)"><svg><use href="#i-next"/></svg><span className="cap">Next bar</span></button>
           <button className="btn icon tog" id="loopBtn" data-tog="loop"></button>
           <button className="btn icon tog" id="speedBtn" data-tog="speed"></button>
           <button className="btn icon tog" id="namesBtn" data-tog="names"></button>
           <button className="btn icon tog" id="handBtn" data-tog="hand"></button>
-          <button className="btn icon tog" id="soundBtn" data-tog="sound"></button>
-          <button className="btn icon tog" id="levelBtn" data-tog="level" hidden></button>
-          <button className="btn icon tog" id="sourceBtn" data-tog="source"></button>
+          <button className="btn icon tog more" id="soundBtn" data-tog="sound"></button>
+          <button className="btn icon tog more" id="levelBtn" data-tog="level" hidden></button>
+          <button className="btn icon tog more" id="sourceBtn" data-tog="source"></button>
           <button className="btn icon tog" id="viewBtn" data-tog="view"></button>
-          <div className="volume">
+          <div className="volume more" id="volumeBox">
             <button className="btn icon" id="mute" aria-label="Mute" title="Mute"><svg className="i-volume"><use href="#i-volume"/></svg><svg className="i-mute"><use href="#i-mute"/></svg></button>
             <input type="range" id="volume" min="0" max="1" step="0.01" defaultValue="0.8" aria-label="Volume"/>
           </div>
-          <button className="btn icon" id="downloadBtn" aria-label="Download the sheet" title="Download the sheet as an image"><svg><use href="#i-download"/></svg></button>
-          <button className="btn icon tog" id="videoBtn" aria-label="Video" title="Show / hide the video"><svg><use href="#i-video"/></svg></button>
+          <button className="btn icon more" id="downloadBtn" aria-label="Download the sheet" title="Download the sheet as an image"><svg><use href="#i-download"/></svg><span className="cap">Download</span></button>
+          <button className="btn icon tog" id="videoBtn" aria-label="Video" title="Show / hide the video"><svg><use href="#i-video"/></svg><span className="cap">Video</span></button>
         </div>
+        <div className="modes">
+          <button className="btn icon" id="maxBtn" aria-label="All controls" title="All controls"><svg className="i-more"><use href="#i-more"/></svg><svg className="i-less"><use href="#i-chevron"/></svg></button>
+          <button className="btn icon" id="miniBtn" aria-label="Fold the controls into the disc" title="Fold the controls into the disc"><svg><use href="#i-shrink"/></svg></button>
+        </div>
+        <button className="bar-grow" id="growBtn" aria-label="Show the controls" title="Show the controls"><svg><use href="#i-grow"/></svg></button>
         <div className="menu" id="songMenu" hidden>
           <nav id="songs" aria-label="Songs"></nav>
-          <p className="hint">Red = notes playing now. Tap a note to jump to it.<br/>The sheet is auto-transcribed — trust your ears.<span className="version">v{process.env.NEXT_PUBLIC_VERSION}</span></p>
+          <p className="hint">Red = notes playing now. Tap a note to jump to it.<br/>The sheet is auto-transcribed — trust your ears.<span className="version"><span>v{process.env.NEXT_PUBLIC_VERSION}</span><button className="reload" id="reloadBtn">Reload the app</button></span></p>
         </div>
         <div className="toast" id="toast" aria-live="polite"></div>
       </footer>

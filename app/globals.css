@@ -156,7 +156,13 @@ body[data-view="keys"] .back-pill { bottom: calc(var(--keys-h) + 12px); }
 .row[aria-current="true"]::after { content: "♪"; margin-left: auto; }
 @media (pointer: coarse) { .row { min-height: 44px; } }
 .hint { color: var(--muted); font-size: 12px; padding: 10px 18px 14px; border-top: 1px solid rgba(255, 255, 255, .08); }
-.version { display: block; margin-top: 6px; opacity: .6; }
+.version { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 6px; }
+.version span { opacity: .6; }
+.reload { color: var(--fg); font-weight: 700; padding: 4px 10px; border-radius: 999px; background: rgba(255, 255, 255, .1); }
+@media (hover: hover) { .reload:hover { background: rgba(255, 255, 255, .18); } }
+@media (pointer: coarse) { .reload { min-height: 36px; } }
+/* Only in the installed app: a browser has its own reload. */
+@media not all and (display-mode: standalone) { .reload { display: none; } }
 
 /* ---------- Video card: floats bottom right, drag it anywhere ---------- */
 .now {
@@ -182,8 +188,8 @@ body.no-video .no-video { display: grid; }
 /* ---------- Floating controller ---------- */
 .bar {
   position: fixed; z-index: 25; left: 50%; bottom: calc(16px + var(--safe-b));
-  transform: translateX(-50%); width: min(880px, calc(100vw - 32px - 2 * var(--safe-x)));
-  display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 14px;
+  transform: translateX(-50%); width: min(960px, calc(100vw - 32px - 2 * var(--safe-x)));
+  display: flex; align-items: center; gap: 14px;
   padding: 8px 14px 8px 8px; border-radius: 48px;
   --glass-fill: rgba(30, 30, 30, .72); --glass-edge: rgba(255, 255, 255, .14); --glass-hi: rgba(255, 255, 255, .2);
   box-shadow: inset 0 0 0 1px var(--glass-edge), inset 0 1.5px 0 var(--glass-hi), 0 16px 40px rgba(0, 0, 0, .45);
@@ -243,7 +249,7 @@ body.playing .disc-icon .i-pause { display: block; }
   body.playing .disc-btn:hover .disc-icon, body.playing .disc-btn:focus-visible .disc-icon { opacity: 1; }
 }
 
-.np { display: flex; flex-direction: column; align-items: flex-start; min-width: 0; }
+.np { flex: 1; display: flex; flex-direction: column; align-items: flex-start; min-width: 0; }
 .np-title { display: flex; align-items: center; gap: 4px; max-width: 100%; padding: 2px 6px; margin-left: -6px; border-radius: 8px; }
 .np-title b { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 15px; }
 .np-title svg { width: 18px; height: 18px; color: var(--muted); transition: transform .2s; }
@@ -253,6 +259,10 @@ body.playing .disc-icon .i-pause { display: block; }
 .np-time { color: var(--muted); font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; }
 
 .side { display: flex; align-items: center; justify-content: flex-end; gap: 2px; min-width: 0; }
+.modes { display: flex; align-items: center; gap: 2px; padding-left: 8px; margin-left: -6px; border-left: 1px solid rgba(255, 255, 255, .12); }
+.cap { display: none; }
+#maxBtn .i-less, body.max #maxBtn .i-more { display: none; }
+body.max #maxBtn .i-less { display: block; }
 .volume { display: flex; align-items: center; }
 .volume input { width: 72px; flex: none; margin-right: 6px; }
 #mute .i-mute, body.muted #mute .i-volume { display: none; }
@@ -292,10 +302,61 @@ input[type="range"]:focus-visible { outline: none; }
   input[type="range"]::-moz-range-thumb { opacity: 1; }
 }
 
+/* ---------- Max: a panel with every control and its name, the same on every screen ---------- */
+body.max .bar {
+  width: min(560px, calc(100vw - 16px - 2 * var(--safe-x)));
+  display: grid; grid-template: "disc np modes" auto "side side side" auto / auto minmax(0, 1fr) auto;
+  gap: 14px 12px; padding: 12px; border-radius: 28px;
+}
+body.max .disc { grid-area: disc; }
+body.max .np { grid-area: np; }
+body.max .modes { grid-area: modes; align-self: start; padding: 0; margin: 0; border: 0; }
+body.max .side {
+  grid-area: side; display: grid; grid-template-columns: repeat(auto-fill, minmax(76px, 1fr)); gap: 6px;
+  padding-top: 12px; border-top: 1px solid rgba(255, 255, 255, .1);
+}
+body.max .side > .icon, body.max .volume {
+  width: auto; height: 64px; border-radius: 14px; background: rgba(255, 255, 255, .05);
+}
+body.max .side > .icon { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; }
+body.max .side > .more, body.max .volume { display: flex; }
+body.max .cap { display: block; font-size: 11px; font-weight: 600; letter-spacing: 0; color: var(--muted); }
+body.max .btn[aria-pressed="true"] .cap { color: var(--accent); }
+body.max .btn[aria-pressed="true"]::after { bottom: auto; top: 8px; left: auto; right: 8px; margin: 0; }
+body.max .volume { grid-column: span 2; padding: 0 10px 0 4px; }
+body.max .volume input { display: block; width: auto; flex: 1; }
 
-/* ---------- Tablet: no volume slider ---------- */
+/* ---------- Mini: just the disc, the same on every screen; drag it anywhere ---------- */
+.bar-grow { display: none; }
+/* Bottom left, clear of the video card. */
+body.mini .bar {
+  display: block; left: calc(16px + var(--safe-l)); width: auto; transform: none;
+  padding: 6px; border-radius: 50%; touch-action: none; cursor: grab;
+}
+body.mini .bar > :not(.disc, .bar-grow) { display: none; }
+body.mini .bar-grow {
+  display: grid; place-items: center; position: absolute; top: -4px; right: -4px; z-index: 2;
+  width: 26px; height: 26px; border-radius: 50%; background: rgba(30, 30, 30, .92); color: #fff;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .2), 0 4px 12px rgba(0, 0, 0, .4);
+}
+.bar-grow svg { width: 14px; height: 14px; }
+.bar-grow::before { content: ""; position: absolute; inset: -8px; }  /* a bigger target for a finger */
+.bar-grow:focus-visible { outline: 2px solid rgba(255, 255, 255, .5); outline-offset: 2px; }
+
+/* Switching modes (a view transition, see setMode): only the bar's parts are captured, the
+   sheet and the falling notes keep playing under them. The glass keeps its blur. */
+:root { view-transition-name: none; }
+::view-transition-group(*) { animation-duration: .35s; animation-timing-function: cubic-bezier(.3, .7, .2, 1); }
+::view-transition-group(bar-bar) {
+  border-radius: 36px; overflow: clip;
+  -webkit-backdrop-filter: blur(14px) saturate(1.8); backdrop-filter: blur(14px) saturate(1.8);
+}
+::view-transition-old(bar-bar), ::view-transition-new(bar-bar) { height: 100%; }
+
+/* ---------- Tablet: the most used controls, the rest in the panel ---------- */
 @media (max-width: 1099px) {
   .volume input { display: none; }
+  body:not(.max) .side > .more { display: none; }
 }
 
 /* ---------- Phone: disc and title on top, the tools in a row under them ---------- */
@@ -304,17 +365,11 @@ input[type="range"]:focus-visible { outline: none; }
   .sheet-head h1 { font-size: 15px; }
   .scroller { padding: 0 8px 50vh; }
   .paper { padding: 4px 6px; border-radius: 10px; }
-  .bar {
-    width: calc(100vw - 16px - 2 * var(--safe-x)); bottom: calc(8px + var(--safe-b));
-    grid-template: "disc np" auto "side side" auto / auto minmax(0, 1fr);
-    gap: 2px 12px; padding: 8px 6px 6px 8px; border-radius: 24px;
-  }
-  .disc { --size: 60px; grid-area: disc; }
+  /* The disc and the song's name; the controls are in the panel. */
+  .bar { width: calc(100vw - 16px - 2 * var(--safe-x)); bottom: calc(8px + var(--safe-b)); gap: 12px; padding: 6px 8px 6px 6px; border-radius: 40px; }
+  body:not(.max) .side { display: none; }
+  .disc { --size: 60px; }
   .disc-btn { inset: 7px; }
-  .np { grid-area: np; }
-  .side { grid-area: side; justify-content: space-between; }
-  .volume { display: none; }
-  .side .icon { flex: 1 1 0; max-width: 40px; min-width: 0; }  /* every tool fits a 375px phone */
   /* The keys fill the pane. The sheet still renders under them (the player needs its width
      and its MIDI), so it's hidden, never display: none. */
   body[data-view="keys"] .scroller { position: absolute; inset: 0 var(--safe-r) 0 var(--safe-l); visibility: hidden; pointer-events: none; }
