@@ -32,7 +32,8 @@ uv run python scripts/check_highlight.py output/song.musicxml  # player highligh
 second half clearly changes, chord names on top; `--one-chord` keeps it to one per bar). If
 most bars change chord on beat 3, the bar lines are half a bar off: add `--shift 8`. It writes
 one sheet per left-hand level, `<out>.<level>.*`, easiest first: `root` (one held note), `fifth`
-(root + fifth held), `broken` (1-5-8-5 in quarters), `ballad` (1-5-8-10-8-5-8-5 in eighths).
+(root + fifth held), `broken` (1-5-8-5 in eighths, twice a bar, like the left hand of the
+Canon_in_D and DoiBo-QuiSaura sheets), `ballad` (1-5-8-10-8-5-8-5 in eighths).
 
 To add a song to the player, put `output/<name>.musicxml` and `output/<name>.timing.json`
 (both written by `to_sheet.py`) and the recording `output/<audio>.wav` in place, and add it to

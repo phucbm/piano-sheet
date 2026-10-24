@@ -92,7 +92,7 @@ def spell(midi):
 LEVELS = {
     "root": "one held root note per chord",
     "fifth": "root + fifth held together",
-    "broken": "1-5-8-5 in quarter notes",
+    "broken": "1-5-8-5 in 8th notes, once per half bar (like Canon_in_D, DoiBo-QuiSaura)",
     "ballad": "1-5-8-10-8-5-8-5 in 8th notes",
 }
 
@@ -149,8 +149,8 @@ def left_hand(level):
     """The easy left hand at one level, over the guessed chords."""
     lh, low = {}, 48
     for start, length, (root, quality) in spans:
-        if level == "ballad":
-            low = 40 + (root - 40) % 12  # root between E2 and Eb3, so the 10th stays near middle C
+        if level in ("broken", "ballad"):
+            low = 40 + (root - 40) % 12  # root between E2 and Eb3: low like a printed sheet, the 10th near middle C
         else:  # root between F2 and G3, nearest the last one, so the hand hardly moves
             low = min((m for m in range(41, 56) if m % 12 == root), key=lambda m: abs(m - low))
         root_p = spell(low)  # pattern notes spelled from the root: E-B-E-G#, not E-B-E-Ab
@@ -160,7 +160,7 @@ def left_hand(level):
         notes = {  # (offset, length, degrees) in 16ths
             "root": [(0, length, [1])],
             "fifth": [(0, length, [1, 5])],
-            "broken": [(4 * j, 4, [d]) for j, d in enumerate([1, 5, 8, 5][:length // 4])],
+            "broken": [(2 * j, 2, [d]) for j, d in enumerate(([1, 5, 8, 5] * 2)[:length // 2])],
             "ballad": [(2 * j, 2, [d]) for j, d in enumerate([1, 5, 8, 10, 8, 5, 8, 5][:length // 2])],
         }[level]
         for at, dur, ds in notes:
