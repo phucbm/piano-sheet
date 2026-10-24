@@ -80,6 +80,7 @@ h1, h2, p { margin: 0; }
 #score svg svg { overflow: visible; }
 #score g.note, #score text.note-name { cursor: pointer; }
 #score g.system { transition: opacity .35s; }
+#score .score-msg { color: #555; font-weight: 600; text-align: center; padding: 72px 16px; }
 body.playing #score g.system:not(.current) { opacity: .38; }
 g.playing, g.playing * { fill: var(--accent) !important; stroke: var(--accent) !important; }
 text.note-name { fill: #2a6fb0; font-family: system-ui, sans-serif; }

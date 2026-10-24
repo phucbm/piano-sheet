@@ -652,10 +652,16 @@ export function createEngine(root: HTMLElement, SONGS: Song[], navigate: (href: 
     state.pos = 0;
     updateUrl();
     const [xml, timing] = await Promise.all([
-      fetch(media(`${song.name}.musicxml`)).then(r => r.text()),
+      fetch(media(`${song.name}.musicxml`)).then(r => r.ok ? r.text() : null).catch(() => null),
       fetch(media(`${song.name}.timing.json`)).then(r => r.ok ? r.json() : null).catch(() => null),
     ]);
     if (state.song !== song || destroyed) return;
+    if (!xml) {  // offline, and the song hasn't been opened before (see sw/sw.ts)
+      state.xml = "";
+      showMeta(song);
+      scoreEl.innerHTML = `<p class="score-msg">Can't load this sheet. You're offline and it hasn't been opened before.</p>`;
+      return;
+    }
     state.xml = xml;
     state.timing = timing;
     showMeta(song);
