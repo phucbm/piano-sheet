@@ -84,6 +84,8 @@ body.playing #score g.system:not(.current) { opacity: .38; }
 g.playing, g.playing * { fill: var(--accent) !important; stroke: var(--accent) !important; }
 text.note-name { fill: #2a6fb0; font-family: system-ui, sans-serif; }
 text.note-name.playing { fill: var(--accent); font-weight: bold; }
+/* One hand on: the other hand's staff and names fade back. */
+body[data-hand="right"] #score .left, body[data-hand="left"] #score .right { opacity: .3; }
 .back-pill { position: absolute; left: 50%; bottom: calc(var(--bar-h) + 28px); transform: translateX(-50%); box-shadow: inset 0 0 0 1px var(--glass-edge), inset 0 1.5px 0 var(--glass-hi), 0 6px 20px rgba(0, 0, 0, .25); }
 
 

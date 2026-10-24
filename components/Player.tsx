@@ -91,6 +91,7 @@ const Markup = memo(function Markup() {
         <div className="side">
           <button className="btn icon tog" id="speedBtn" data-tog="speed"></button>
           <button className="btn icon tog" id="namesBtn" data-tog="names"></button>
+          <button className="btn icon tog" id="handBtn" data-tog="hand"></button>
           <button className="btn icon tog" id="sourceBtn" data-tog="source"></button>
           <div className="volume">
             <button className="btn icon" id="mute" aria-label="Mute" title="Mute"><svg className="i-volume"><use href="#i-volume"/></svg><svg className="i-mute"><use href="#i-mute"/></svg></button>

@@ -43,12 +43,13 @@ export function createEngine(root: HTMLElement, SONGS: Song[], navigate: (href: 
   // the chosen speed, runs pos / speed; the recording runs toRec(pos).
   const state = {
     song: null as Song | null, xml: "", timing: null as Timing | null, duration: 0,
-    speed: 1, names: params.get("names") || "", source: "sheet", volume: 0.8, muted: false,
+    speed: 1, names: params.get("names") || "", hand: params.get("hand") || "", source: "sheet", volume: 0.8, muted: false,
     playing: false, pos: 0, follow: true,
   };
   let tk: any, lastIds: string[] = [], measures: { pos: number; id: string }[] = [], currentSystem: Element | null = null, raf = 0;
   let anchor = { pos: 0, at: 0 };  // while the sheet plays: pos at a moment (performance.now())
   let midiReady: Promise<unknown> = Promise.resolve();
+  let handOf = new Map<string, string>();  // note id -> "right" (top staff) or "left" (bottom staff)
 
   const clamp = (v: number, lo: number, hi: number) => Math.min(Math.max(v, lo), hi);
   const fmt = (s: number) => { s = Math.max(0, Math.round(s)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`; };
@@ -76,7 +77,9 @@ export function createEngine(root: HTMLElement, SONGS: Song[], navigate: (href: 
     let svg = "";
     for (let p = 1; p <= tk.getPageCount(); p++) svg += tk.renderToSVG(p);
     scoreEl.innerHTML = svg;
-    midiReady = new Promise(r => player.addEventListener("load", r, { once: true }));
+    markHands();
+    const loaded = () => new Promise(r => player.addEventListener("load", r, { once: true }));
+    midiReady = loaded().then(() => state.hand && muteOtherHand(loaded()));
     player.src = "data:audio/midi;base64," + tk.renderToMIDI();
     if (state.names) addNoteNames(state.names);  // needs the MIDI for the pitches
     const map = tk.renderToTimemap({ includeMeasures: true });
@@ -102,6 +105,42 @@ export function createEngine(root: HTMLElement, SONGS: Song[], navigate: (href: 
     render();
     if (was) { await midiReady; play(); }
   }
+
+  // The top staff is the right hand, the bottom one the left (a single staff counts as right).
+  function markHands() {
+    handOf = new Map();
+    scoreEl.querySelectorAll("g.measure").forEach(m => {
+      const staves = m.querySelectorAll(":scope > g.staff");
+      staves.forEach((staff, i) => {
+        const hand = i === 0 ? "right" : "left";
+        staff.classList.add(hand);
+        staff.querySelectorAll("g.note").forEach(n => handOf.set(n.id, hand));
+      });
+    });
+    const two = [...handOf.values()].includes("left");
+    $("handBtn").hidden = !two;
+    if (!two) state.hand = "";
+    body.dataset.hand = state.hand;
+    updateToggles();
+  }
+
+  // One hand only: drop the other hand's notes from the loaded MIDI, matched by pitch and
+  // onset (Verovio's ms are rounded, hence the margin). Resolves once the player reloads.
+  function muteOtherHand(reloaded: Promise<unknown>) {
+    const muted = new Map<number, number[]>();  // pitch -> onsets in ms
+    handOf.forEach((hand, id) => {
+      if (hand === state.hand) return;
+      const { time, pitch } = tk.getMIDIValuesForElement(id);
+      (muted.get(pitch) || muted.set(pitch, []).get(pitch)!).push(time);
+    });
+    const ns = player.noteSequence;
+    const notes = ns.notes.filter((n: any) => !muted.get(n.pitch)?.some(t => Math.abs(t - n.startTime * 1000) < 5));
+    player.noteSequence = Object.assign(Object.create(Object.getPrototypeOf(ns)), ns, { notes });
+    return reloaded;
+  }
+
+  // The notes to light: with one hand on, only that hand's.
+  const ofHand = (ids: string[]) => state.hand ? ids.filter(id => handOf.get(id) === state.hand) : ids;
 
   const STEPS: Record<string, number> = { c: 0, d: 2, e: 4, f: 5, g: 7, a: 9, b: 11 };
   const SOLFEGE: Record<string, string> = { c: "Do", d: "Re", e: "Mi", f: "Fa", g: "Sol", a: "La", b: "Si" };
@@ -181,7 +220,7 @@ export function createEngine(root: HTMLElement, SONGS: Song[], navigate: (href: 
         const texts = col.map(n => {
           const t = document.createElementNS(SVG, "text");
           Object.entries({ x: col[0].x, "font-size": size, "text-anchor": "middle",
-                           class: "note-name", "data-note": n.id })
+                           class: "note-name " + (si === 0 ? "right" : "left"), "data-note": n.id })
             .forEach(([k, v]) => t.setAttribute(k, String(v)));
           t.textContent = n.text;
           staff.parentNode!.appendChild(t);
@@ -227,7 +266,7 @@ export function createEngine(root: HTMLElement, SONGS: Song[], navigate: (href: 
 
   // Light the notes sounding at pos (used when the video leads, or after a seek).
   function lightAt(pos: number) {
-    const ids: string[] = tk.getElementsAtTime(Math.round(pos / state.speed * 1000) + 10).notes || [];
+    const ids = ofHand(tk.getElementsAtTime(Math.round(pos / state.speed * 1000) + 10).notes || []);
     if (ids.join() === lastIds.join()) return;
     light(lastIds, false);
     light(ids, true);
@@ -366,7 +405,7 @@ export function createEngine(root: HTMLElement, SONGS: Song[], navigate: (href: 
     // Verovio's timemap is in ms at the rendered tempo, rounded to whole ms; look a little
     // past the onset so a note starting at 1384.6 ms (stored as 1385) isn't skipped.
     // scripts/check_highlight.py checks every sheet with the same margin.
-    const ids: string[] = tk.getElementsAtTime(Math.round(e.detail.note.startTime * 1000) + 10).notes || [];
+    const ids = ofHand(tk.getElementsAtTime(Math.round(e.detail.note.startTime * 1000) + 10).notes || []);
     light(lastIds, false);
     light(ids, true);
     lastIds = ids;
@@ -424,6 +463,12 @@ export function createEngine(root: HTMLElement, SONGS: Song[], navigate: (href: 
     rerender();
   }
 
+  function setHand(hand: string) {
+    state.hand = hand;
+    updateUrl();
+    rerender();
+  }
+
   on(volumeEl, "input", () => { state.volume = +volumeEl.value; state.muted = false; applyVolume(); });
   on($("mute"), "click", () => { state.muted = !state.muted; if (!state.volume) state.volume = 0.8; applyVolume(); });
 
@@ -474,6 +519,11 @@ export function createEngine(root: HTMLElement, SONGS: Song[], navigate: (href: 
       values: ["", "letter", "solfege"], get: () => state.names, set: setNames,
       label: v => ({ "": "Aa", letter: "CDE", solfege: "Do" } as any)[v],
       name: v => "Note names " + ({ "": "off", letter: "C D E", solfege: "Do Re Mi" } as any)[v], on: v => !!v,
+    },
+    hand: {
+      values: ["", "right", "left"], get: () => state.hand, set: setHand,
+      label: v => ({ "": "LR", right: "R", left: "L" } as any)[v],
+      name: v => ({ "": "Both hands", right: "Right hand only", left: "Left hand only" } as any)[v], on: v => !!v,
     },
     source: {
       values: ["sheet", "original", "both"], get: () => state.source, set: setSource,
@@ -545,8 +595,11 @@ export function createEngine(root: HTMLElement, SONGS: Song[], navigate: (href: 
 
   // ---------- Songs ----------
 
-  // The page for a song, keeping the note names.
-  const hrefOf = (song: Song) => `/song/${song.name}/` + (state.names ? "?" + new URLSearchParams({ names: state.names }) : "");
+  // The page for a song, keeping the note names and hand.
+  function hrefOf(song: Song) {
+    const q = new URLSearchParams(Object.entries({ names: state.names, hand: state.hand }).filter(([, v]) => v));
+    return `/song/${song.name}/` + (q.size ? "?" + q : "");
+  }
 
   function buildLibrary() {
     const groups = new Map<string, Song[]>();
