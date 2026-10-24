@@ -1,4 +1,4 @@
-"""Check that the player in index.html highlights every note of a sheet.
+"""Check that the player (player.js) highlights every note of a sheet.
 
 Plays the sheet like the browser does (Verovio MIDI, one lookup per note onset,
 10 ms past the onset) at every speed and lists notes that never turn red.
@@ -18,8 +18,8 @@ import verovio
 
 warnings.filterwarnings("ignore")  # pretty_midi complains about Verovio's tempo track
 
-SPEEDS = [0.5, 0.75, 1.0]  # options of the Speed select in index.html
-MARGIN_MS = 10  # same as the "note" handler in index.html
+SPEEDS = [0.5, 0.75, 1.0]  # speeds the player offers (player.js)
+MARGIN_MS = 10  # same as the "note" handler in player.js
 
 
 def check(xml, speed):

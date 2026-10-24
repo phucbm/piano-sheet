@@ -5,6 +5,7 @@ onto that beat grid and snapped to 16th notes.
 
 Usage:
   uv run python scripts/to_sheet.py output/song.wav output/song.raw.mid output/song
+  -> output/song.musicxml, song.mid, and song.timing.json (recording time of each 16th)
 Options:
   --split 60     MIDI pitch where the right hand starts (60 = middle C)
   --half         tracked beat is an eighth note (slow song); auto when tempo > 100
@@ -15,6 +16,7 @@ Options:
   --title "..."
 """
 import argparse
+import json
 
 import librosa
 import numpy as np
@@ -172,5 +174,12 @@ score.write("musicxml", fp=f"{a.out}.musicxml")
 # Chord names are for reading only; music21 would play them, so drop them from the MIDI.
 audio = score.flatten().getElementsNotOfClass(harmony.ChordSymbol).stream() if chords else score
 audio.write("midi", fp=f"{a.out}.mid")
+# Recording time of every sixteenth on the sheet (sixteenth 0 = start of bar 1), and the
+# tempo the sheet plays at, so the player can keep the original video in step with it.
+bars = -(-max(s["off"] for h in events.values() for s in h.values()) // 16)
+grid_16ths = (np.arange(bars * 16 + 1) - a.shift + first) / sixteenths
+timing = {"bpm": round(quarter_bpm), "sixteenths": np.round(np.interp(grid_16ths, np.arange(len(grid)), grid), 3).tolist()}
+with open(f"{a.out}.timing.json", "w") as f:
+    json.dump(timing, f, separators=(",", ":"))
 print(f"key {k} ({sharps:+d}), ~{round(quarter_bpm)} BPM (quarter), half={half}, rh={len(events['rh'])} lh={len(events['lh'])} onsets")
-print("wrote", f"{a.out}.musicxml", f"{a.out}.mid")
+print("wrote", f"{a.out}.musicxml", f"{a.out}.mid", f"{a.out}.timing.json")

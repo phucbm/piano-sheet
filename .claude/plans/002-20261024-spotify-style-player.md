@@ -1,6 +1,6 @@
 # 002: Spotify-style player with the original video and glass controls
 
-Written: 2026-10-24. Status: Draft
+Written: 2026-10-24. Status: Steps 1–4 done 2026-10-24 (step 5 not started)
 Related: plan 001 (the pipeline and the first player), perxel-web-2026 `app/custom.css` (glass reference)
 
 ## Goal
@@ -179,3 +179,31 @@ beats librosa tracked, which speed up and slow down. A straight seconds-to-secon
 - Use the liquid lens on the main play button, or plain glass everywhere?
 - Should the video panel be open by default on desktop, or only when the source is Original or
   Both?
+
+## Done (2026-10-24)
+
+Steps 1–4 are in `index.html`, `player.css`, `player.js`, plus `to_sheet.py` writing
+`output/<name>.timing.json` (both current sheets reproduce exactly with default options, so only
+the timing files were added; the sheets themselves are unchanged).
+
+Decisions on the open questions (defaults, easy to change):
+
+- Accent stays red `#e8442e`, used for the notes playing now and the seek fill on hover.
+- Plain glass everywhere. The play button is the same glass with a near-white fill, no lens.
+- The video panel is open by default on desktop and tablet; the 🎬 button in the bar toggles it.
+
+Choices made while building:
+
+- In **Both**, the sheet is the leader and plays at 35% volume under the video. The video follows
+  by nudging its `playbackRate` when it drifts more than 80 ms and jumps when it drifts more than
+  0.5 s, so the piano sound is never cut by seeks. In **Original**, the video leads and the
+  notes are lit from its time.
+- Version names in the library and the "Now playing" pills are the slug minus the recording's
+  slug (`original` when they are the same, `easy-in-C`); the full slug is the title and tooltip.
+- On tablet and phone, Sound / Speed / Note names / Volume move into the "⋯" panel (a bottom
+  sheet on phone), where each shows its options as a row of glass pills.
+- Changing the speed re-renders the sheet (Verovio's `midiTempoAdjustment` needs it) and carries
+  on from the same place.
+
+Not checked in a browser in this session (static checks only): `node --check`, the highlight
+check, and the files serving under Vite.

@@ -5,7 +5,9 @@ Turn a piano video/recording into a two-hand sheet and practise it in the browse
 **Live demo: https://phucbm.github.io/piano-sheet/** ([easy version in C](https://phucbm.github.io/piano-sheet/?song=vien-da-nho-easy-in-C))
 
 The player renders the sheet, plays it back at 50–100% speed, highlights the notes as they
-sound, and lets you compare with the original recording.
+sound and follows the current line, and plays the original video in step with the sheet
+(sound from the sheet, the original, or both). Tap a note to jump to it. It works on phone,
+tablet and desktop.
 
 ## Requirements
 
@@ -27,8 +29,11 @@ uv run python scripts/check_highlight.py output/song.musicxml  # player highligh
 (move bar lines by N sixteenths), `--half` (slow song, tracked beat = eighth), `--transpose N`,
 `--easy` (right hand as played, left hand = ballad 1-5-8-10 on guessed chords, chord names on top).
 
-To add a song to the player, put `output/<name>.musicxml` (and the recording as
-`output/<audio>.wav`) in place and add it to `SONGS` in `index.html`.
+To add a song to the player, put `output/<name>.musicxml` and `output/<name>.timing.json`
+(both written by `to_sheet.py`) and the recording `output/<audio>.wav` in place, and add it to
+`SONGS` at the top of `player.js`, with `video: "input/<file>"` if there is a video. The
+timing file gives the recording time of every sixteenth on the sheet, so the video stays in step
+even though the sheet plays at one fixed tempo.
 
 ## How
 
@@ -36,13 +41,14 @@ To add a song to the player, put `output/<name>.musicxml` (and the recording as
 2. ByteDance piano transcription (high-resolution onset/offset model) writes MIDI.
 3. `to_sheet.py` tracks the beat with librosa, snaps notes to 16ths, splits hands at middle C,
    spells notes for the key, writes MusicXML.
-4. `index.html` renders it with Verovio and plays it with html-midi-player, highlighting notes.
+4. `index.html` + `player.js` render it with Verovio and play it with html-midi-player,
+   highlighting notes, with the original video kept in step through `<name>.timing.json`.
 
 Open `output/*.musicxml` in MuseScore (free) to fix notes by hand.
 
 ## Deploy
 
-The player is a single static `index.html`, served from the `main` branch root by GitHub Pages.
+The player is static (`index.html`, `player.css`, `player.js`, no build step), served from the `main` branch root by GitHub Pages.
 Every push to `main` redeploys https://phucbm.github.io/piano-sheet/.
 
 ## Contributing

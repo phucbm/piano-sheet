@@ -21,10 +21,10 @@ Plus a browser player to read along, listen, slow down and compare with the reco
 | Video -> mono 16 kHz wav | ffmpeg | `scripts/run.sh` |
 | Audio -> MIDI | ByteDance piano transcription (CRNN, `models/piano_crnn.pth`, downloaded from Zenodo, not in git) | `scripts/transcribe.py` |
 | MIDI -> MusicXML + clean MIDI | librosa beat tracking, music21 | `scripts/to_sheet.py` |
-| Read / play | Verovio (render + timemap) + html-midi-player, served by `python3 -m http.server 8000` | `index.html` |
+| Read / play | Verovio (render + timemap) + html-midi-player + the original video kept in step by `<name>.timing.json`, served by `pnpm dev` (redesigned in plan 002) | `index.html`, `player.css`, `player.js` |
 
 `scripts/run.sh input/song.mp4 [options]` runs all three steps; then add the song to
-`SONGS` in `index.html`.
+`SONGS` in `player.js` (was `index.html` before plan 002).
 
 ### Decisions in `to_sheet.py`
 

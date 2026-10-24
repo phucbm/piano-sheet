@@ -2,236 +2,144 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#121212">
 <title>Piano sheet player</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap">
+<link rel="stylesheet" href="player.css">
 <script src="https://www.verovio.org/javascript/latest/verovio-toolkit-wasm.js" defer></script>
 <script src="https://cdn.jsdelivr.net/combine/npm/tone@14.7.58,npm/@magenta/music@1.23.1/es6/core.js,npm/focus-visible@5,npm/html-midi-player@1.5.0"></script>
-<style>
-  body { font-family: system-ui, sans-serif; margin: 0; background: #fafaf7; color: #222; }
-  header { position: sticky; top: 0; z-index: 2; background: #fff; border-bottom: 1px solid #ddd;
-           padding: 10px 16px; display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: center; }
-  header h1 { font-size: 16px; margin: 0; }
-  label { font-size: 13px; display: flex; gap: 6px; align-items: center; }
-  midi-player { width: 360px; }
-  audio { height: 32px; }
-  #score { padding: 16px; max-width: 1200px; margin: auto; }
-  #score svg { width: 100%; height: auto; background: #fff; margin-bottom: 12px; }
-  #score svg svg { overflow: visible; }
-  g.playing, g.playing * { fill: #e8442e !important; stroke: #e8442e !important; }
-  text.note-name { fill: #2a6fb0; font-family: system-ui, sans-serif; }
-  text.note-name.playing { fill: #e8442e; font-weight: bold; }
-  .hint { font-size: 12px; color: #777; }
-</style>
+<script src="player.js" defer></script>
 </head>
-<body>
-<header>
-  <h1 id="title">Loading…</h1>
-  <label>Song <select id="song"></select></label>
-  <label>Speed <select id="speed">
-    <option value="0.5">50%</option><option value="0.75">75%</option><option value="1" selected>100%</option>
-  </select></label>
-  <label>Note names <select id="names">
-    <option value="">Off</option><option value="letter">C D E</option><option value="solfege">Do Re Mi</option>
-  </select></label>
-  <midi-player id="player" sound-font></midi-player>
-  <label>Original <audio id="orig" controls preload="none"></audio></label>
-  <span class="hint">Red = notes playing now. Sheet is auto-transcribed — trust your ears.</span>
-</header>
-<div id="score"></div>
+<body data-tab="sheet">
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-play" viewBox="0 0 24 24"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.5-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5Z"/></symbol>
+  <symbol id="i-pause" viewBox="0 0 24 24"><rect x="6" y="5" width="4" height="14" rx="1.2"/><rect x="14" y="5" width="4" height="14" rx="1.2"/></symbol>
+  <symbol id="i-prev" viewBox="0 0 24 24"><rect x="5" y="5" width="2.4" height="14" rx="1"/><path d="M19 6.2v11.6a1 1 0 0 1-1.55.83L9.2 13.2a1.4 1.4 0 0 1 0-2.4l8.25-5.43A1 1 0 0 1 19 6.2Z"/></symbol>
+  <symbol id="i-next" viewBox="0 0 24 24"><rect x="16.6" y="5" width="2.4" height="14" rx="1"/><path d="M5 6.2v11.6a1 1 0 0 0 1.55.83l8.25-5.43a1.4 1.4 0 0 0 0-2.4L6.55 5.37A1 1 0 0 0 5 6.2Z"/></symbol>
+  <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/></symbol>
+  <symbol id="i-close" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/></symbol>
+  <symbol id="i-down" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" fill="none"/></symbol>
+  <symbol id="i-more" viewBox="0 0 24 24"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></symbol>
+  <symbol id="i-video" viewBox="0 0 24 24"><rect x="3" y="6" width="13" height="12" rx="2.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="m16 10.5 5-3v9l-5-3Z"/></symbol>
+  <symbol id="i-focus" viewBox="0 0 24 24"><path d="M4 9V5a1 1 0 0 1 1-1h4M15 4h4a1 1 0 0 1 1 1v4M20 15v4a1 1 0 0 1-1 1h-4M9 20H5a1 1 0 0 1-1-1v-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/></symbol>
+  <symbol id="i-volume" viewBox="0 0 24 24"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4Z"/><path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/></symbol>
+  <symbol id="i-mute" viewBox="0 0 24 24"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4Z"/><path d="m16 9.5 5 5m0-5-5 5" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/></symbol>
+  <symbol id="i-small" viewBox="0 0 24 24"><path d="M14 4v6h6M10 20v-6H4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/></symbol>
+  <symbol id="i-note" viewBox="0 0 24 24"><path d="M9 17.5V6l10-2v11.5" stroke="currentColor" stroke-width="2" fill="none"/><circle cx="6.5" cy="17.5" r="2.5"/><circle cx="16.5" cy="15.5" r="2.5"/></symbol>
+</svg>
 
-<script>
-// Add new songs here: output/<name>.musicxml, original recording output/<audio>.wav.
-const SONGS = [
-  { name: "vien-da-nho", audio: "vien-da-nho" },
-  { name: "vien-da-nho-easy-in-C", audio: "vien-da-nho" },
-];
+<div id="app">
+  <aside class="library" id="library" aria-label="Library">
+    <div class="panel-head">
+      <h2>Library</h2>
+      <button class="glass icon lib-close" id="libClose" aria-label="Close library"><svg><use href="#i-close"/></svg></button>
+    </div>
+    <nav id="songs"></nav>
+  </aside>
 
-const songSel = document.getElementById("song");
-const speedSel = document.getElementById("speed");
-const namesSel = document.getElementById("names");
-const player = document.getElementById("player");
-const scoreEl = document.getElementById("score");
-let tk, xml, lastIds = [];
+  <div class="phone-top" id="phoneTop">
+    <button class="glass icon" id="collapse" aria-label="Close player"><svg><use href="#i-down"/></svg></button>
+    <div class="tabs" role="tablist">
+      <button class="glass pill" role="tab" data-tab="sheet">Sheet</button>
+      <button class="glass pill" role="tab" data-tab="video">Video</button>
+      <button class="glass pill" role="tab" data-tab="library">Library</button>
+    </div>
+  </div>
 
-SONGS.forEach(s => songSel.add(new Option(s.name, s.name)));
-const params = new URLSearchParams(location.search);
-if (params.get("song")) songSel.value = params.get("song");
-if (params.get("names")) namesSel.value = params.get("names");
+  <main class="sheet-pane">
+    <header class="sheet-head">
+      <button class="glass icon lib-open" id="libOpen" aria-label="Library"><svg><use href="#i-menu"/></svg></button>
+      <div>
+        <h1 id="title">Loading…</h1>
+        <p id="meta"></p>
+      </div>
+    </header>
+    <div class="scroller" id="scroller">
+      <div class="paper" id="score"></div>
+    </div>
+    <button class="glass light pill back-pill" id="backToCurrent" hidden>Back to current</button>
+  </main>
 
-function render() {
-  tk.setOptions({
-    pageWidth: Math.min(scoreEl.clientWidth, 1200) * 100 / 45,
-    scale: 45, adjustPageHeight: true, breaks: "auto",
-    midiTempoAdjustment: Number(speedSel.value),
-  });
-  tk.loadData(xml);
-  let svg = "";
-  for (let p = 1; p <= tk.getPageCount(); p++) svg += tk.renderToSVG(p);
-  scoreEl.innerHTML = svg;
-  player.src = "data:audio/midi;base64," + tk.renderToMIDI();
-  if (namesSel.value) addNoteNames(namesSel.value);  // needs the MIDI for the pitches
-}
+  <aside class="now" id="now" aria-label="Now playing">
+    <div class="panel-head" id="nowHead">
+      <h2>Now playing</h2>
+      <button class="glass icon now-small" id="nowSmall" aria-label="Make smaller"><svg><use href="#i-small"/></svg></button>
+      <button class="glass icon now-close" id="nowClose" aria-label="Close video"><svg><use href="#i-close"/></svg></button>
+    </div>
+    <div class="video-wrap">
+      <video id="video" playsinline webkit-playsinline preload="auto" muted></video>
+      <div class="no-video"><svg><use href="#i-note"/></svg></div>
+    </div>
+    <div class="now-body">
+      <div class="versions" id="versions"></div>
+      <p class="hint">Red = notes playing now. Tap a note to jump to it.<br>The sheet is auto-transcribed — trust your ears.</p>
+    </div>
+  </aside>
 
-const STEPS = { c: 0, d: 2, e: 4, f: 5, g: 7, a: 9, b: 11 };
-const SOLFEGE = { c: "Do", d: "Re", e: "Mi", f: "Fa", g: "Sol", a: "La", b: "Si" };
-
-// The written letter comes from the note; the sharp/flat from how far the sounding
-// pitch is from that letter, so key signatures and earlier accidentals count.
-function noteName(id, style) {
-  const { pname, oct } = tk.getElementAttr(id);
-  const pitch = tk.getMIDIValuesForElement(id).pitch;
-  const acc = { "-2": "𝄫", "-1": "♭", 1: "♯", 2: "𝄪" }[pitch - 12 * (+oct + 1) - STEPS[pname]] || "";
-  return { pitch, text: (style === "solfege" ? SOLFEGE[pname] : pname.toUpperCase()) + acc };
-}
-
-// Study mode: each note's name above the top staff and below the bottom one (single
-// staff: below), chords stacked highest on top. Chord symbols and tempo move up above
-// the names, and the lines of music below move down to make room. Labels carry
-// data-note so the player can light them up.
-function addNoteNames(style) {
-  scoreEl.querySelectorAll("svg.definition-scale").forEach(page => {
-    let shift = 0, prevBottom = -Infinity;
-    page.querySelectorAll("g.system").forEach(system => {
-      const before = system.getBBox();
-      const space = labelSystem(system, style);
-      const after = system.getBBox();
-      shift = Math.max(shift, before.y - after.y, prevBottom + space * 2 - after.y);
-      system.setAttribute("transform", `translate(0, ${shift})`);
-      prevBottom = after.y + after.height + shift;
-    });
-    // Grow the page to fit the moved lines.
-    const vb = page.viewBox.baseVal;
-    const margin = page.querySelector("g.page-margin").transform.baseVal[0]?.matrix.f || 0;
-    const height = Math.max(vb.height, prevBottom + margin * 2);
-    const outer = page.parentNode;
-    outer.setAttribute("height", outer.height.baseVal.value * height / vb.height + "px");
-    page.setAttribute("viewBox", `${vb.x} ${vb.y} ${vb.width} ${height}`);
-  });
-}
-
-const LIFTED = "harm, tempo, dir, dynam, reh";  // text that sits above the top staff
-
-function labelSystem(system, style) {
-  const SVG = "http://www.w3.org/2000/svg";
-  const measures = [...system.querySelectorAll("g.measure")];
-  const staves = measures.map(m => [...m.querySelectorAll(":scope > g.staff")]);
-  const lineYs = staff => [...staff.querySelectorAll(":scope > path")].map(p => p.getBBox().y);
-  const ys = lineYs(staves[0][0]);
-  const space = (Math.max(...ys) - Math.min(...ys)) / (ys.length - 1);
-  const size = space * 1.4, gap = space * 0.6;
-  const twoSided = staves[0].length > 1;
-
-  // One label row edge per side for the whole line, clear of notes, stems, slurs and ties.
-  const curves = measures.flatMap(m => [...m.querySelectorAll(":scope > g.slur, :scope > g.tie")])
-    .map(c => c.getBBox());
-  const topLine = Math.min(...staves.map(s => Math.min(...lineYs(s[0]))));
-  const bottomLine = Math.max(...staves.map(s => Math.max(...lineYs(s.at(-1)))));
-  const top = Math.min(...staves.map(s => s[0].getBBox().y),
-                       ...curves.filter(b => b.y < topLine).map(b => b.y)) - gap;
-  const bottom = Math.max(...staves.map(s => { const b = s.at(-1).getBBox(); return b.y + b.height; }),
-                          ...curves.filter(b => b.y + b.height > bottomLine).map(b => b.y + b.height)) + gap;
-
-  let labelsTop = top;
-  const rowsAbove = [], rowsBelow = [];  // per row, the x spans taken by names
-  staves.forEach(measureStaves => measureStaves.forEach((staff, si) => {
-    const above = twoSided && si === 0;
-    if (!above && si !== measureStaves.length - 1) return;
-    const notes = [...staff.querySelectorAll("g.note")].map(n => {
-      const head = (n.querySelector("g.notehead") || n).getBBox();
-      return { id: n.id, x: head.x + head.width / 2, ...noteName(n.id, style) };
-    }).sort((a, b) => a.x - b.x);
-    const columns = [];
-    notes.forEach(n => {
-      const col = columns.at(-1);
-      if (col && n.x - col[0].x < space) col.push(n); else columns.push([n]);
-    });
-    columns.forEach(col => {
-      col.sort((a, b) => b.pitch - a.pitch);
-      const texts = col.map(n => {
-        const t = document.createElementNS(SVG, "text");
-        Object.entries({ x: col[0].x, "font-size": size, "text-anchor": "middle",
-                         class: "note-name", "data-note": n.id })
-          .forEach(([k, v]) => t.setAttribute(k, v));
-        t.textContent = n.text;
-        staff.parentNode.appendChild(t);
-        const half = t.getComputedTextLength() / 2 + size * 0.15;
-        return { t, from: col[0].x - half, to: col[0].x + half };
-      });
-      // Row 0 hugs the staff. A column that would touch a neighbour's names moves out a row.
-      const rows = above ? rowsAbove : rowsBelow;
-      const rowOf = i => above ? col.length - 1 - i : i;
-      const free = k => texts.every((l, i) =>
-        !(rows[k + rowOf(i)] || []).some(([from, to]) => l.from < to && from < l.to));
-      let k = 0;
-      while (!free(k)) k++;
-      texts.forEach((l, i) => {
-        const row = k + rowOf(i);
-        (rows[row] ||= []).push([l.from, l.to]);
-        // Baselines: above, a name sits on its row; below, it hangs from it.
-        const y = above ? top - row * size : bottom + (row + 0.8) * size;
-        if (above) labelsTop = Math.min(labelsTop, y - size * 0.8);
-        l.t.setAttribute("y", y);
-      });
-    });
-  }));
-
-  if (twoSided) {
-    const lifted = measures.flatMap(m => [...m.querySelectorAll(LIFTED.split(", ").map(c => `:scope > g.${c}`).join())])
-      .filter(el => { const b = el.getBBox(); return b.height && b.y < topLine; });
-    const lowest = Math.max(...lifted.map(el => { const b = el.getBBox(); return b.y + b.height; }));
-    const up = lowest - (labelsTop - gap);
-    if (up > 0) lifted.forEach(el => el.setAttribute("transform", `translate(0, ${-up})`));
-  }
-  return space;
-}
-
-function light(ids, on) {
-  ids.forEach(id => {
-    document.getElementById(id)?.classList.toggle("playing", on);
-    scoreEl.querySelector(`[data-note="${id}"]`)?.classList.toggle("playing", on);
-  });
-}
-
-function updateUrl() {
-  const q = new URLSearchParams({ song: songSel.value });
-  if (namesSel.value) q.set("names", namesSel.value);
-  history.replaceState(null, "", "?" + q);
-}
-
-async function load() {
-  const name = songSel.value;
-  updateUrl();
-  xml = await (await fetch(`output/${name}.musicxml`)).text();
-  const song = SONGS.find(s => s.name === name);
-  document.getElementById("orig").src = `output/${song.audio}.wav`;
-  render();
-  document.getElementById("title").textContent = name;
-}
-
-player.addEventListener("note", e => {
-  // Verovio's timemap is in ms at the rendered tempo, rounded to whole ms; look a little
-  // past the onset so a note starting at 1384.6 ms (stored as 1385) isn't skipped.
-  const ids = tk.getElementsAtTime(Math.round(e.detail.note.startTime * 1000) + 10).notes || [];
-  light(lastIds, false);
-  light(ids, true);
-  if (ids[0]) document.getElementById(ids[0])?.scrollIntoView({ block: "center", behavior: "smooth" });
-  lastIds = ids;
-});
-player.addEventListener("stop", () => {
-  light(lastIds, false);
-  lastIds = [];
-});
-
-songSel.addEventListener("change", load);
-speedSel.addEventListener("change", render);
-namesSel.addEventListener("change", () => { updateUrl(); render(); });
-
-document.addEventListener("DOMContentLoaded", () => {
-  verovio.module.onRuntimeInitialized = () => {
-    tk = new verovio.toolkit();
-    load();
-  };
-});
-</script>
+  <footer class="bar glass" id="bar">
+    <div class="progress-line"><i id="progressLine"></i></div>
+    <button class="np" id="np" aria-label="Open player">
+      <span class="thumb"><img id="thumb" alt=""><svg><use href="#i-note"/></svg></span>
+      <span class="np-text"><b id="npName"></b><small id="npSub"></small></span>
+    </button>
+    <div class="transport">
+      <div class="buttons">
+        <button class="glass icon" id="prevBar" aria-label="Back one bar" title="Back one bar (←)"><svg><use href="#i-prev"/></svg></button>
+        <button class="glass icon play" id="play" aria-label="Play" title="Play / pause (Space)"><svg class="i-play"><use href="#i-play"/></svg><svg class="i-pause"><use href="#i-pause"/></svg></button>
+        <button class="glass icon" id="nextBar" aria-label="Forward one bar" title="Forward one bar (→)"><svg><use href="#i-next"/></svg></button>
+      </div>
+      <div class="seek">
+        <span id="timeNow">0:00</span>
+        <input type="range" id="seek" min="0" max="1000" value="0" step="1" aria-label="Seek">
+        <span id="timeEnd">0:00</span>
+      </div>
+    </div>
+    <div class="side">
+      <div class="extras" id="extras">
+        <div class="sheet-grip"></div>
+        <div class="pick" data-pick="source">
+          <span class="pick-label">Sound</span>
+          <button class="glass pill pick-btn" aria-haspopup="menu" title="Sound"></button>
+          <div class="pick-menu glass" role="menu">
+            <button role="menuitemradio" data-v="sheet">Sheet</button>
+            <button role="menuitemradio" data-v="original">Original</button>
+            <button role="menuitemradio" data-v="both">Both</button>
+          </div>
+        </div>
+        <div class="pick" data-pick="speed">
+          <span class="pick-label">Speed</span>
+          <button class="glass pill pick-btn" aria-haspopup="menu" title="Speed"></button>
+          <div class="pick-menu glass" role="menu">
+            <button role="menuitemradio" data-v="0.5">50%</button>
+            <button role="menuitemradio" data-v="0.75">75%</button>
+            <button role="menuitemradio" data-v="1">100%</button>
+          </div>
+        </div>
+        <div class="pick" data-pick="names">
+          <span class="pick-label">Note names</span>
+          <button class="glass pill pick-btn" aria-haspopup="menu" title="Note names"></button>
+          <div class="pick-menu glass" role="menu">
+            <button role="menuitemradio" data-v="">Off</button>
+            <button role="menuitemradio" data-v="letter">C D E</button>
+            <button role="menuitemradio" data-v="solfege">Do Re Mi</button>
+          </div>
+        </div>
+        <div class="volume">
+          <span class="pick-label">Volume</span>
+          <button class="glass icon" id="mute" aria-label="Mute"><svg class="i-volume"><use href="#i-volume"/></svg><svg class="i-mute"><use href="#i-mute"/></svg></button>
+          <input type="range" id="volume" min="0" max="1" step="0.01" value="0.8" aria-label="Volume">
+        </div>
+        <button class="glass icon" id="focusBtn" aria-label="Focus mode" title="Focus mode: hide the side panels"><svg><use href="#i-focus"/></svg></button>
+      </div>
+      <button class="glass icon" id="videoBtn" aria-label="Show video" title="Show / hide the video"><svg><use href="#i-video"/></svg></button>
+      <button class="glass icon" id="moreBtn" aria-label="More options"><svg><use href="#i-more"/></svg></button>
+    </div>
+  </footer>
+</div>
+<div class="scrim" id="scrim"></div>
+<midi-player id="player" sound-font hidden></midi-player>
 </body>
 </html>
