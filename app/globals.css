@@ -149,6 +149,7 @@ body[data-hand="right"] #score .left, body[data-hand="left"] #score .right { opa
 .row[aria-current="true"]::after { content: "♪"; margin-left: auto; }
 @media (pointer: coarse) { .row { min-height: 44px; } }
 .hint { color: var(--muted); font-size: 12px; padding: 10px 18px 14px; border-top: 1px solid rgba(255, 255, 255, .08); }
+.version { display: block; margin-top: 6px; opacity: .6; }
 
 /* ---------- Video card: floats bottom right, drag it anywhere ---------- */
 .now {

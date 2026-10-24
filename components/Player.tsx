@@ -98,7 +98,7 @@ const Markup = memo(function Markup() {
         </div>
         <div className="menu" id="songMenu" hidden>
           <nav id="songs" aria-label="Songs"></nav>
-          <p className="hint">Red = notes playing now. Tap a note to jump to it.<br/>The sheet is auto-transcribed — trust your ears.</p>
+          <p className="hint">Red = notes playing now. Tap a note to jump to it.<br/>The sheet is auto-transcribed — trust your ears.<span className="version">v{process.env.NEXT_PUBLIC_VERSION}</span></p>
         </div>
         <div className="toast" id="toast" aria-live="polite"></div>
       </footer>
