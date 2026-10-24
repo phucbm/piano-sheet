@@ -9,7 +9,7 @@ uv sync
 mkdir -p models && curl -L -o models/piano_crnn.pth "https://zenodo.org/record/4034264/files/CRNN_note_F1%3D0.9677_pedal_F1%3D0.9186.pth?download=1"
 scripts/run.sh input/song.mp4               # -> output/song.musicxml + .mid
 scripts/run.sh input/song.mp4 --transpose -6 --easy  # easy version (set N so it lands in C)
-python3 -m http.server 8000                 # open http://localhost:8000
+pnpm install && pnpm dev                     # serves + opens http://localhost:8000
 ```
 
 `to_sheet.py` options: `--split 60` (pitch where the right hand starts), `--shift N`

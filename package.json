@@ -1,0 +1,10 @@
+{
+  "name": "piano-sheet",
+  "private": true,
+  "scripts": {
+    "dev": "vite --port 8000 --open"
+  },
+  "devDependencies": {
+    "vite": "^8.3.5"
+  }
+}
