@@ -6,8 +6,9 @@ Turn a piano video/recording into a two-hand sheet and practise it in the browse
 
 The player renders the sheet, plays it back at 50–100% speed, highlights the notes as they
 sound and follows the current line, and plays the original video in step with the sheet
-(sound from the sheet, the original, or both). Tap a note to jump to it. It works on phone,
-tablet and desktop.
+(sound from the sheet, the original, or both). Tap a note to jump to it. The sheet fills the
+screen with one floating controller; the library (☰) and the video are hidden until you open
+them. It works on phone, tablet and desktop.
 
 ## Requirements
 

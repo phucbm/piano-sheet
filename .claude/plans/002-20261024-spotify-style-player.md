@@ -1,6 +1,6 @@
 # 002: Spotify-style player with the original video and glass controls
 
-Written: 2026-10-24. Status: Steps 1–4 done 2026-10-24 (step 5 not started)
+Written: 2026-10-24. Status: Steps 1–4 done 2026-10-24, layout redone sheet-first the same day (see Revision; step 5 not started)
 Related: plan 001 (the pipeline and the first player), perxel-web-2026 `app/custom.css` (glass reference)
 
 ## Goal
@@ -10,8 +10,8 @@ desktop:
 
 - the sheet is the main view and follows the music, like Spotify's synced lyrics;
 - the original recording's video can be watched next to the sheet, in time with it;
-- a single bottom bar controls everything (one play button, one seek bar);
-- every clickable element uses Perxel's glass material.
+- a single floating controller drives everything (one play button, one seek bar);
+- minimal: plain icons, glass only on what floats over the sheet.
 
 Not in scope: changes to the transcription pipeline, except the timing file in step 4.
 
@@ -28,58 +28,78 @@ Not in scope: changes to the transcription pipeline, except the timing file in s
 
 ## Layout
 
-### Desktop (≥ 1100px): library | sheet | now playing, plus a bottom bar
+Sheet first: focus mode is the only mode. The sheet fills the screen, both side panels start
+hidden, and the controls float over the sheet. (The first build had three columns and a docked
+bar; see Revision.)
+
+### Desktop (≥ 1100px)
 
 ```
-┌────────────┬─────────────────────────────────┬──────────────┐
-│ LIBRARY    │  vien-da-nho                    │ NOW PLAYING  │
-│            │  Original · 4/4 · ♩=…           │ ┌──────────┐ │
-│ vien-da-nho│ ─────────────────────────────── │ │  video   │ │
-│  • original│ ┌─────────── paper ───────────┐ │ │ portrait │ │
-│  • easy-in-C│ │ current line highlighted,  │ │ │  9:16    │ │
-│            │ │ others dimmed, auto-scroll  │ │ └──────────┘ │
-│            │ └─────────────────────────────┘ │ versions     │
-│            │                                 │ hint / credit│
-├────────────┴─────────────────────────────────┴──────────────┤
-│ [thumb] vien-da-nho  ⏪ ▶ ⏩  0:42 ━━━●──── 1:04  🎹|🎬  75%  Aa  🔊  ⛶ │
-└─────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────────────┐
+│ ☰  vien-da-nho  original · 4/4 · ♩ = 72                                      │
+│            ┌────────────────────────────────────────────────────┐            │
+│            │  𝄞 ♩ ♩ ♪♪ ♩ │ ♩ ♩ ♩ ♩ │ ...    (current line)     │            │
+│            │  𝄞 ♩ ♪♪ ♩ ♩ │ ...           (dimmed)           │            │
+│            │                  sheet, full height                │            │
+│            └────────────────────────────────────────────────────┘            │
+│                                                          ┌────────────────┐  │
+│                                                          │ video (▭ only) │  │
+│                                                          └────────────────┘  │
+│     ╭────────────────────────────────────────────────────────────────────╮   │
+│     │ ┌──┐ vien-da-nho   │    ⏮   ( ▶ )   ⏭     │  1×  Aa  ♪  🔈━━  ▭ │   │
+│     │ └──┘ original      │ 0:42 ━━━━●──────── 3:10 │                      │   │
+│     ╰────────────────────────────────────────────────────────────────────╯   │
+└──────────────────────────────────────────────────────────────────────────────┘
 ```
 
-- **Library (left, about 240px):** songs grouped by their source recording (`audio`), with the
-  versions under each. Can collapse to an icon rail.
-- **Sheet (centre):** a header with the name and meta (version, time signature and tempo read
-  from the MusicXML), then the paper card. The line being played stays near the centre and the
-  other lines are dimmed a little. Scrolling by hand pauses auto-follow and shows a glass
-  "Back to current" pill.
-- **Now playing (right, about 320px):** the original video (`input/vien-da-nho.MP4` is
-  576×1024 portrait H.264, 3.6 MB, and plays in the browser as it is), the version switcher, and
-  the "auto-transcribed, trust your ears" hint. It can be closed. It shows the song's thumbnail
-  and no video when a song has none.
-- **Bottom bar (fixed, glass):**
-  - Left: thumbnail (the video's poster frame) and name.
-  - Centre: play/pause, back one bar / forward one bar, seek bar with current time and length.
-  - Right:
-    - source toggle **Sheet / Original / Both** (in Both, the sheet sound is muted under the
-      video);
-    - speed 50 / 75 / 100%;
-    - note names Off / C D E / Do Re Mi;
-    - volume;
-    - focus mode, which hides both side panels.
+- **☰ (top left):** opens the library as a drawer over the sheet (songs grouped by recording,
+  versions under each, the "trust your ears" hint at the bottom). Picking a song or clicking
+  outside closes it.
+- **Sheet:** a one-line header (name and meta read from the MusicXML), then the paper card.
+  The current line stays near the centre, the others dim, scrolling by hand shows "Back to
+  current".
+- **Video:** off by default. ▭ shows it as a small floating card, bottom right above the
+  controller, that can be dragged anywhere and closed with its ✕.
+- **Controller:** floats 16px above the bottom, centred, at most 880px wide, the sheet scrolls
+  under it. Three groups:
+  - left: thumbnail, name, version;
+  - centre: back one bar, play/pause, forward one bar, seek bar with times;
+  - right: speed, note names, sound, mute + volume, video.
 
-### Tablet (700–1100px)
+### Tablet (700–1099px)
 
-The library becomes a drawer behind a ☰ button. Now playing becomes a floating video card in a
-corner that can be dragged, made smaller, or closed.
+Same layout; the name and the volume slider go (mute stays).
 
 ### Phone (< 700px)
 
-- A mini player sits at the bottom: name, play button, and a thin progress line along its top
-  edge.
-- Tapping it opens a full-screen view that slides up, with tabs **Sheet | Video | Library**.
-  The full transport is on top and it closes with a swipe down.
-- Speed, note names and source go into a "⋯" bottom sheet.
-- The sheet re-renders when the width or orientation changes (debounced). It already sizes
-  itself from `clientWidth`.
+```
+┌──────────────────────────────┐
+│ ☰  vien-da-nho  original     │
+│  𝄞 ♩ ♩ ♪♪ ♩ │ ♩ ♩ ♩ ♩       │
+│         sheet                │
+│ ╭──────────────────────────╮ │
+│ │ 0:42 ━━━━━●──────── 3:10 │ │
+│ │ 1×  Aa   ⏮ ( ▶ ) ⏭   ♪  ▭ │ │
+│ ╰──────────────────────────╯ │
+└──────────────────────────────┘
+```
+
+No mini player, no tabs, no "⋯": the sheet is the default view and the controller floats in two
+rows. The phone's own buttons set the volume. The video card is smaller (140px).
+
+### Toggles, never dropdowns
+
+Every setting is one button; one click steps to the next option. The button shows the current
+option, turns red with a dot under it when not on the default, and a toast above the controller
+says what it switched to for a moment.
+
+| Button | One click goes to | Shows |
+|---|---|---|
+| Speed | 100% → 75% → 50% → 100% | `1×` / `.75×` / `.5×` |
+| Note names | off → C D E → Do Re Mi → off | `Aa` / `CDE` / `Do` |
+| Sound | Sheet → Original → Both → Sheet | note / waveform / both icons |
+| Mute | on ↔ off | speaker icon |
+| Video | card on ↔ off | camera icon |
 
 ## Visual style
 
@@ -87,8 +107,9 @@ Dark, music-app base: page `#121212`, panels `#181818`, text `#fff` / muted `#a7
 Manrope (as perxel-web), falling back to `system-ui`. Accent: the existing red `#e8442e` for
 "playing now" (notes, current line, seek fill).
 
-**Glass on every clickable element** (buttons, selects, pills, library rows on hover, bottom
-bar, floating video card, drawer). This is Perxel's `.px-glass` dark tone from
+**Glass only on what floats over the sheet:** the controller, the video card and "Back to
+current". Buttons inside the controller are plain grey icons that turn white on hover; the only
+filled shape is the white play button. This is Perxel's `.px-glass` dark tone from
 `perxel-web-2026/app/custom.css`, copied as plain CSS:
 
 ```css
@@ -114,8 +135,7 @@ bar, floating video card, drawer). This is Perxel's `.px-glass` dark tone from
   top half, soft inner glow) so it stands out. Optional.
 - Pills and round icon buttons: radius 999px. Panels: 12–16px. The seek bar's handle appears on
   hover or drag.
-- Selects become glass buttons that open a small glass menu, because a native `<select>`
-  can't be styled as glass.
+- No selects and no menus: settings are toggles (see Layout).
 
 ## Playback model
 
@@ -190,7 +210,8 @@ Decisions on the open questions (defaults, easy to change):
 
 - Accent stays red `#e8442e`, used for the notes playing now and the seek fill on hover.
 - Plain glass everywhere. The play button is the same glass with a near-white fill, no lens.
-- The video panel is open by default on desktop and tablet; the 🎬 button in the bar toggles it.
+- ~~The video panel is open by default on desktop and tablet.~~ Now off by default; ▭ toggles
+  the floating card (see Revision).
 
 Choices made while building:
 
@@ -198,12 +219,27 @@ Choices made while building:
   by nudging its `playbackRate` when it drifts more than 80 ms and jumps when it drifts more than
   0.5 s, so the piano sound is never cut by seeks. In **Original**, the video leads and the
   notes are lit from its time.
-- Version names in the library and the "Now playing" pills are the slug minus the recording's
+- Version names in the library are the slug minus the recording's
   slug (`original` when they are the same, `easy-in-C`); the full slug is the title and tooltip.
-- On tablet and phone, Sound / Speed / Note names / Volume move into the "⋯" panel (a bottom
-  sheet on phone), where each shows its options as a row of glass pills.
 - Changing the speed re-renders the sheet (Verovio's `midiTempoAdjustment` needs it) and carries
   on from the same place.
 
 Not checked in a browser in this session (static checks only): `node --check`, the highlight
 check, and the files serving under Vite.
+
+## Revision: sheet-first, minimal controls (2026-10-24)
+
+The first build was not minimal: three columns, glass on every button, labelled dropdown pills,
+a "⋯" panel, and a phone mini player with tabs. Redone to the Layout above:
+
+- Library and Now playing columns removed; library is a ☰ drawer, video a floating card, both
+  hidden by default. The Focus button is gone, because the sheet-only view is now the default.
+- The bar floats over the sheet instead of being docked; its groups are left / centre / right.
+- Speed, note names and sound are one-click toggles with a toast; the dropdown menus, the "⋯"
+  panel, the phone mini player, its full-screen view and tabs are removed.
+- Glass only on the controller, the video card and "Back to current"; plain icons in the bar.
+- The "Now playing" version pills are gone (versions are in the library); the hint moved to the
+  library's footer.
+
+Checked: `node --check player.js`, the highlight check on both sheets. Not checked in a browser
+in this session.

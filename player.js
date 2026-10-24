@@ -10,8 +10,6 @@ const player = $("player"), video = $("video"), scoreEl = $("score"), scroller =
 const seekEl = $("seek"), volumeEl = $("volume");
 const body = document.body;
 const params = new URLSearchParams(location.search);
-const phone = matchMedia("(max-width: 699px)");
-const tablet = matchMedia("(min-width: 700px) and (max-width: 1099px)");
 
 // Positions ("pos") are seconds of the sheet at 100% speed. The sheet's MIDI, rendered at
 // the chosen speed, runs pos / speed; the recording runs toRec(pos).
@@ -432,7 +430,6 @@ function updateBar(pos = now()) {
     $("timeNow").textContent = fmt(pos / state.speed);
   }
   $("timeEnd").textContent = fmt(state.duration / state.speed);
-  $("progressLine").style.width = p * 100 + "%";
 }
 seekEl.addEventListener("input", () => {
   seeking = true;
@@ -457,97 +454,84 @@ document.addEventListener("keydown", e => {
 // A focused button would also click on Space's keyup.
 document.addEventListener("keyup", e => e.code === "Space" && e.target.closest("button") && e.preventDefault());
 
-// Picks: a glass button that opens a glass menu (desktop), or a row of pills (in the "⋯" panel).
-const PICKS = {
-  source: { get: () => state.source, set: setSource, label: v => ({ sheet: "♪ Sheet", original: "▶ Original", both: "♪+▶ Both" })[v] },
-  speed: { get: () => String(state.speed), set: v => setSpeed(+v), label: v => +v * 100 + "%" },
-  names: { get: () => state.names, set: setNames, label: v => ({ "": "Aa Off", letter: "C D E", solfege: "Do Re Mi" })[v] },
+// Toggles: one click steps to the next option, the button shows the current one, and a
+// short toast above the bar says what it switched to.
+const TOGGLES = {
+  speed: {
+    values: [1, 0.75, 0.5], get: () => state.speed, set: setSpeed,
+    label: v => `${String(v).replace(/^0/, "")}×`, name: v => `Speed ${v * 100}%`, on: v => v !== 1,
+  },
+  names: {
+    values: ["", "letter", "solfege"], get: () => state.names, set: setNames,
+    label: v => ({ "": "Aa", letter: "CDE", solfege: "Do" })[v],
+    name: v => "Note names " + ({ "": "off", letter: "C D E", solfege: "Do Re Mi" })[v], on: v => !!v,
+  },
+  source: {
+    values: ["sheet", "original", "both"], get: () => state.source, set: setSource,
+    label: v => `<svg><use href="#i-${({ sheet: "note", original: "wave", both: "both" })[v]}"/></svg>`,
+    name: v => "Sound: " + ({ sheet: "Sheet", original: "Original", both: "Both" })[v], on: v => v !== "sheet",
+  },
 };
-function updatePicks() {
-  document.querySelectorAll(".pick").forEach(pick => {
-    const { get, label } = PICKS[pick.dataset.pick], v = get();
-    pick.querySelector(".pick-btn").textContent = label(v);
-    pick.querySelectorAll(".pick-menu button").forEach(b => b.setAttribute("aria-checked", b.dataset.v === v));
+function updateToggles() {
+  document.querySelectorAll("[data-tog]").forEach(b => {
+    const t = TOGGLES[b.dataset.tog], v = t.get();
+    b.innerHTML = t.label(v);
+    b.title = t.name(v);
+    b.setAttribute("aria-label", t.name(v));
+    b.setAttribute("aria-pressed", t.on(v));
   });
 }
-document.querySelectorAll(".pick").forEach(pick => {
-  pick.querySelector(".pick-btn").addEventListener("click", e => {
-    e.stopPropagation();
-    const open = !pick.classList.contains("open");
-    document.querySelectorAll(".pick.open").forEach(p => p.classList.remove("open"));
-    pick.classList.toggle("open", open);
-  });
-  pick.querySelectorAll(".pick-menu button").forEach(b => b.addEventListener("click", () => {
-    pick.classList.remove("open");
-    const { get, set } = PICKS[pick.dataset.pick];
-    if (b.dataset.v !== get()) { set(b.dataset.v); updatePicks(); }
-  }));
-});
-document.addEventListener("click", e => {
-  if (!e.target.closest(".pick")) document.querySelectorAll(".pick.open").forEach(p => p.classList.remove("open"));
-});
-
-// ---------- Panels ----------
-
-function closeOverlays() {
-  body.classList.remove("lib-open", "more-open");
-  document.querySelectorAll(".pick.open").forEach(p => p.classList.remove("open"));
+let toastTimer;
+function toast(text) {
+  $("toast").textContent = text;
+  $("toast").classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => $("toast").classList.remove("show"), 1200);
 }
+document.querySelectorAll("[data-tog]").forEach(b => b.addEventListener("click", () => {
+  const t = TOGGLES[b.dataset.tog];
+  const next = t.values[(t.values.indexOf(t.get()) + 1) % t.values.length];
+  t.set(next);
+  updateToggles();
+  toast(t.name(next));
+}));
+
+// The bar's height places the video card and "Back to current" above it.
+new ResizeObserver(() => document.documentElement.style.setProperty("--bar-h", $("bar").offsetHeight + "px")).observe($("bar"));
+
+// ---------- Library and video ----------
+
+const setLibrary = open => body.classList.toggle("lib-open", open);
+function closeOverlays() { setLibrary(false); }
 $("scrim").addEventListener("click", closeOverlays);
-$("libOpen").addEventListener("click", () => body.classList.add("lib-open"));
-$("libClose").addEventListener("click", () => body.classList.remove("lib-open"));
-$("moreBtn").addEventListener("click", () => body.classList.toggle("more-open"));
+$("libOpen").addEventListener("click", () => setLibrary(true));
+$("libClose").addEventListener("click", () => setLibrary(false));
 
 function setVideoOpen(open) {
-  body.classList.toggle("now-closed", !open);
+  $("now").hidden = !open;
   $("videoBtn").setAttribute("aria-pressed", open);
-  if (open) body.classList.remove("focus");
-  $("focusBtn").setAttribute("aria-pressed", body.classList.contains("focus"));
 }
-$("videoBtn").addEventListener("click", () => setVideoOpen(body.classList.contains("now-closed") || body.classList.contains("focus")));
+$("videoBtn").addEventListener("click", () => { setVideoOpen($("now").hidden); toast($("now").hidden ? "Video off" : "Video on"); });
 $("nowClose").addEventListener("click", () => setVideoOpen(false));
-$("nowSmall").addEventListener("click", () => $("now").classList.toggle("small"));
-$("focusBtn").addEventListener("click", () => {
-  body.classList.toggle("focus");
-  $("focusBtn").setAttribute("aria-pressed", body.classList.contains("focus"));
-});
 
-// Tablet: drag the floating video card by its head.
+// Drag the video card anywhere; it goes back to its corner when the window resizes.
 (() => {
   const card = $("now");
   let start = null;
-  $("nowHead").addEventListener("pointerdown", e => {
-    if (!tablet.matches || e.target.closest("button")) return;
+  card.addEventListener("pointerdown", e => {
+    if (e.target.closest("button")) return;
     const r = card.getBoundingClientRect();
     start = { x: e.clientX - r.left, y: e.clientY - r.top };
-    $("nowHead").setPointerCapture(e.pointerId);
+    card.setPointerCapture(e.pointerId);
   });
-  $("nowHead").addEventListener("pointermove", e => {
+  card.addEventListener("pointermove", e => {
     if (!start) return;
     const x = clamp(e.clientX - start.x, 8, innerWidth - card.offsetWidth - 8);
     const y = clamp(e.clientY - start.y, 8, innerHeight - card.offsetHeight - 8);
     Object.assign(card.style, { left: x + "px", top: y + "px", right: "auto", bottom: "auto" });
   });
-  $("nowHead").addEventListener("pointerup", () => start = null);
-  tablet.addEventListener("change", () => Object.assign(card.style, { left: "", top: "", right: "", bottom: "" }));
-})();
-
-// Phone: the mini player opens the full-screen view; a swipe down (or the chevron) closes it.
-function setExpanded(on) { body.classList.toggle("expanded", on); }
-function setTab(tab) {
-  body.dataset.tab = tab;
-  document.querySelectorAll(".tabs [data-tab]").forEach(b => b.setAttribute("aria-selected", b.dataset.tab === tab));
-}
-$("np").addEventListener("click", () => { if (phone.matches) { setExpanded(true); setTab("sheet"); } });
-$("collapse").addEventListener("click", () => setExpanded(false));
-document.querySelectorAll(".tabs [data-tab]").forEach(b => b.addEventListener("click", () => setTab(b.dataset.tab)));
-(() => {
-  let y0 = null;
-  $("phoneTop").addEventListener("touchstart", e => y0 = e.touches[0].clientY, { passive: true });
-  $("phoneTop").addEventListener("touchend", e => {
-    if (y0 !== null && e.changedTouches[0].clientY - y0 > 60) setExpanded(false);
-    y0 = null;
-  });
+  card.addEventListener("pointerup", () => start = null);
+  addEventListener("resize", () => Object.assign(card.style, { left: "", top: "", right: "", bottom: "" }));
 })();
 
 // ---------- Songs ----------
@@ -563,14 +547,13 @@ function buildLibrary() {
     group.querySelector(".group-name span:last-child").textContent = audio;
     songs.forEach(s => {
       const row = document.createElement("button");
-      row.className = "row glass";
+      row.className = "row";
       row.dataset.song = s.name;
       row.title = s.name;
       row.textContent = versionOf(s);
       row.addEventListener("click", () => {
         if (s !== state.song) load(s);
-        body.classList.remove("lib-open");
-        if (phone.matches) { setExpanded(true); setTab("sheet"); }
+        setLibrary(false);
       });
       group.appendChild(row);
     });
@@ -596,16 +579,6 @@ function showMeta(song) {
   $("npSub").textContent = versionOf(song);
   document.title = `${song.name} · Piano sheet player`;
   document.querySelectorAll(".row").forEach(r => r.setAttribute("aria-current", r.dataset.song === song.name));
-  $("versions").innerHTML = "";
-  SONGS.filter(s => s.audio === song.audio).forEach(s => {
-    const b = document.createElement("button");
-    b.className = "glass pill";
-    b.textContent = versionOf(s);
-    b.title = s.name;
-    b.setAttribute("aria-pressed", s === song);
-    b.addEventListener("click", () => s !== state.song && load(s));
-    $("versions").appendChild(b);
-  });
 }
 
 async function load(song) {
@@ -657,11 +630,9 @@ video.addEventListener("seeked", () => {
 // ---------- Start ----------
 
 buildLibrary();
-updatePicks();
+updateToggles();
 applyVolume();
-setTab("sheet");
-setExpanded(phone.matches);
-setVideoOpen(true);
+setVideoOpen(false);
 
 document.addEventListener("DOMContentLoaded", () => {
   verovio.module.onRuntimeInitialized = () => {
