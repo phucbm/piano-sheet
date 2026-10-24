@@ -22,7 +22,7 @@ export type Engine = { show: (name: string | null) => void; destroy: () => void 
 export function createEngine(root: HTMLElement, SONGS: Song[], navigate: (href: string) => void): Engine {
   const $ = (id: string): any => root.querySelector("#" + id);
   const player = $("player"), video: HTMLVideoElement = $("video"), scoreEl: HTMLElement = $("score"), scroller: HTMLElement = $("scroller");
-  const seekEl: HTMLInputElement = $("seek"), volumeEl: HTMLInputElement = $("volume");
+  const ringEl: HTMLElement = $("ring"), volumeEl: HTMLInputElement = $("volume");
   const body = document.body;
   const params = new URLSearchParams(location.search);
 
@@ -43,7 +43,7 @@ export function createEngine(root: HTMLElement, SONGS: Song[], navigate: (href: 
   // the chosen speed, runs pos / speed; the recording runs toRec(pos).
   const state = {
     song: null as Song | null, xml: "", timing: null as Timing | null, duration: 0,
-    speed: 1, names: params.get("names") || "", hand: params.get("hand") || "", level: params.get("level") || "", source: "sheet", volume: 0.8, muted: false,
+    speed: 1, names: params.get("names") || "", hand: params.get("hand") || "", level: params.get("level") || "", source: "sheet", loop: "", volume: 0.8, muted: false,
     playing: false, pos: 0, follow: true,
   };
   let tk: any, lastIds: string[] = [], measures: { pos: number; id: string }[] = [], currentSystem: Element | null = null, raf = 0;
@@ -85,6 +85,7 @@ export function createEngine(root: HTMLElement, SONGS: Song[], navigate: (href: 
     const map = tk.renderToTimemap({ includeMeasures: true });
     measures = map.filter((e: any) => e.measureOn).map((e: any) => ({ pos: e.tstamp * state.speed / 1000, id: e.measureOn }));
     state.duration = (map.at(-1)?.tstamp || 0) * state.speed / 1000;
+    setLoopRange(state.pos);
     renderedWidth = width;
     lastIds = []; currentSystem = null;
     updateLine(state.pos, true);
@@ -273,11 +274,17 @@ export function createEngine(root: HTMLElement, SONGS: Song[], navigate: (href: 
     lastIds = ids;
   }
 
-  // The line (system) holding pos is the current one: full strength, kept near the middle.
-  function updateLine(pos: number, force?: boolean) {
+  // The bar (index into measures) holding pos, and the line (system) a bar is on.
+  function barAt(pos: number, margin = 0.001) {
     let i = 0;
-    while (i + 1 < measures.length && measures[i + 1].pos <= pos + 0.001) i++;
-    const system = measures[i] && document.getElementById(measures[i].id)?.closest("g.system");
+    while (i + 1 < measures.length && measures[i + 1].pos <= pos + margin) i++;
+    return i;
+  }
+  const systemOf = (i: number) => measures[i] && document.getElementById(measures[i].id)?.closest("g.system");
+
+  // The line holding pos is the current one: full strength, kept near the middle.
+  function updateLine(pos: number, force?: boolean) {
+    const system = systemOf(barAt(pos));
     if (!system || (system === currentSystem && !force)) return;
     currentSystem?.classList.remove("current");
     system.classList.add("current");
@@ -338,6 +345,7 @@ export function createEngine(root: HTMLElement, SONGS: Song[], navigate: (href: 
   }
 
   function pause() {
+    if (loopWait) { clearTimeout(loopWait); loopWait = undefined; stopClicks(); body.classList.remove("playing"); }
     if (!state.playing) return;
     state.pos = now();
     state.playing = false;
@@ -349,25 +357,25 @@ export function createEngine(root: HTMLElement, SONGS: Song[], navigate: (href: 
     updateBar();
   }
 
-  const toggle = () => state.playing ? pause() : play();
+  const toggle = () => state.playing || loopWait ? pause() : play();
 
-  function seek(pos: number) {
+  // follow: false when a loop goes round, so it doesn't pull the sheet back after a scroll.
+  function seek(pos: number, follow = true) {
     pos = clamp(pos, 0, state.duration);
+    if (loopRange && (pos < loopRange[0] - 0.001 || pos >= loopRange[1] - 0.001)) setLoopRange(pos);
     state.pos = pos;
     anchor = { pos, at: performance.now() };
     if (state.playing && leader() === "sheet") player.currentTime = pos / state.speed;
     if (hasMedia() && video.readyState) video.currentTime = clamp(toRec(pos), 0, video.duration);
     if (!state.playing || leader() === "video") lightAt(pos);
     updateLine(pos);
-    setFollow(true);
+    if (follow) setFollow(true);
     updateBar();
   }
 
   // Back to the start of this bar (or the one before when already at its start), or on to the next.
   function stepBar(dir: number) {
-    const pos = now();
-    let i = 0;
-    while (i + 1 < measures.length && measures[i + 1].pos <= pos + 0.01) i++;
+    const pos = now(), i = barAt(pos, 0.01);
     if (dir < 0 && measures[i] && pos - measures[i].pos > 0.4 * state.speed) dir = 0;
     const m = measures[clamp(i + dir, 0, measures.length - 1)];
     if (m) seek(m.pos);
@@ -391,6 +399,8 @@ export function createEngine(root: HTMLElement, SONGS: Song[], navigate: (href: 
   function tick() {
     if (!state.playing) return;
     const pos = now();
+    // A hair early, so the next bar's first note doesn't sound before going round.
+    if (loopRange && pos >= loopRange[1] - 0.02 * state.speed) return loopAround();
     if (leader() === "sheet") followVideo(pos);
     else {
       lightAt(pos);
@@ -414,9 +424,81 @@ export function createEngine(root: HTMLElement, SONGS: Song[], navigate: (href: 
   on(player, "stop", e => {
     light(lastIds, false);
     lastIds = [];
-    if (e.detail?.finished && state.playing && leader() === "sheet") { pause(); state.pos = state.duration; updateBar(); }
+    if (e.detail?.finished && state.playing && leader() === "sheet") ended();
   });
-  on(video, "ended", () => leader() === "video" && pause());
+  on(video, "ended", () => leader() === "video" && ended());
+  // The end of the song: stop there, or go round again when looping.
+  function ended() {
+    if (loopRange) return loopAround();
+    pause();
+    state.pos = state.duration;
+    updateBar();
+  }
+
+  // ---------- Loop ----------
+
+  // Off, the whole song, the row (line) or the bar playing when it's switched on. Seeking
+  // outside a row or bar loop moves it there; the bars outside it fade on the sheet.
+  let loopRange: [number, number] | null = null;
+  let loopWait: ReturnType<typeof setTimeout> | undefined;
+  // At the loop's end: one bar of metronome clicks, then straight back in from its start on the
+  // downbeat. The bar stays in its playing look through the count-in; pause there and it stops
+  // at the loop's start.
+  function loopAround() {
+    pause();
+    seek(loopRange![0], false);
+    body.classList.add("playing");
+    loopWait = setTimeout(() => { loopWait = undefined; play(); }, countIn());
+  }
+  // A bar is the song's usual bar length (the median, so a short pickup bar doesn't count) at
+  // the chosen speed, split into the time signature's beats. Clicks go through Tone's audio
+  // context, which the sheet's sound has already started. Returns the count-in's length in ms.
+  let clicks: OscillatorNode[] = [];
+  function countIn() {
+    const bars = measures.slice(1).map((m, i) => m.pos - measures[i].pos).sort((x, y) => x - y);
+    const bar = (bars[bars.length >> 1] || 2) / state.speed;
+    const beats = +(state.xml.match(/<beats>(\d+)<\/beats>/)?.[1] || 4);
+    const v = state.muted ? 0 : state.volume;
+    try {
+      const ctx: AudioContext = (window as any).Tone.getContext().rawContext;
+      const t0 = ctx.currentTime + 0.05;
+      clicks = [];
+      for (let k = 0; v && k < beats; k++) {
+        const t = t0 + k * bar / beats, osc = ctx.createOscillator(), gain = ctx.createGain();
+        osc.frequency.value = k ? 1000 : 1600;  // the first beat higher
+        gain.gain.setValueAtTime(v * 0.5, t);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.06);
+        osc.connect(gain).connect(ctx.destination);
+        osc.start(t);
+        osc.stop(t + 0.07);
+        clicks.push(osc);
+      }
+    } catch {}
+    return bar * 1000 + 50;
+  }
+  function stopClicks() {
+    clicks.forEach(c => { try { c.stop(); } catch {} });
+    clicks = [];
+  }
+  function setLoopRange(pos: number) {
+    scoreEl.querySelectorAll(".in-loop").forEach(m => m.classList.remove("in-loop"));
+    loopRange = null;
+    if (!state.loop || !measures.length) return;
+    if (state.loop === "all") { loopRange = [0, state.duration]; return; }
+    let a = barAt(pos), b = a + 1;
+    if (state.loop === "row") {
+      const system = systemOf(a);
+      while (a > 0 && systemOf(a - 1) === system) a--;
+      while (b < measures.length && systemOf(b) === system) b++;
+    }
+    for (let i = a; i < b; i++) document.getElementById(measures[i].id)?.classList.add("in-loop");
+    loopRange = [measures[a].pos, measures[b]?.pos ?? state.duration];
+  }
+  function setLoop(loop: string) {
+    state.loop = loop;
+    body.dataset.loop = loop;
+    setLoopRange(now());
+  }
 
   // Tap a note (or its name) to jump there.
   on(scoreEl, "click", e => {
@@ -482,23 +564,48 @@ export function createEngine(root: HTMLElement, SONGS: Song[], navigate: (href: 
 
   // ---------- Bar ----------
 
-  let seeking = false;
+  // The ring around the disc: p (0-1) fills it clockwise from 12 o'clock.
+  function showRing(p: number) {
+    $("ringFill").style.strokeDashoffset = String(100 - p * 100);
+    $("ringKnob").style.transform = `rotate(${p * 360}deg)`;
+    $("timeNow").textContent = fmt(p * state.duration / state.speed);
+    ringEl.setAttribute("aria-valuenow", String(Math.round(p * 100)));
+    ringEl.setAttribute("aria-valuetext", $("timeNow").textContent);
+  }
+  let seeking = false, dragP = 0;
   function updateBar(pos = now()) {
-    const p = state.duration ? clamp(pos / state.duration, 0, 1) : 0;
-    if (!seeking) {
-      seekEl.value = String(Math.round(p * 1000));
-      seekEl.style.setProperty("--p", p * 100 + "%");
-      $("timeNow").textContent = fmt(pos / state.speed);
-    }
+    if (!seeking) showRing(state.duration ? clamp(pos / state.duration, 0, 1) : 0);
     $("timeEnd").textContent = fmt(state.duration / state.speed);
   }
-  on(seekEl, "input", () => {
+  // Drag round the ring to seek; the song jumps there on release. It stops at the end and the
+  // start instead of wrapping past 12 o'clock.
+  function ringAt(e: PointerEvent) {
+    const r = ringEl.getBoundingClientRect();
+    const a = Math.atan2(e.clientX - r.left - r.width / 2, r.top + r.height / 2 - e.clientY);
+    return (a / (2 * Math.PI) + 1) % 1;
+  }
+  on(ringEl, "pointerdown", e => {
+    if (e.target.closest("#play") || !state.duration) return;
     seeking = true;
-    const pos = +seekEl.value / 1000 * state.duration;
-    seekEl.style.setProperty("--p", +seekEl.value / 10 + "%");
-    $("timeNow").textContent = fmt(pos / state.speed);
+    ringEl.setPointerCapture(e.pointerId);
+    ringEl.classList.add("dragging");
+    showRing(dragP = ringAt(e));
   });
-  on(seekEl, "change", () => { seeking = false; seek(+seekEl.value / 1000 * state.duration); });
+  on(ringEl, "pointermove", e => {
+    if (!seeking) return;
+    let p = ringAt(e);
+    if (dragP > .75 && p < .25) p = 1;
+    else if (dragP < .25 && p > .75) p = 0;
+    showRing(dragP = p);
+  });
+  const endDrag = () => {
+    if (!seeking) return;
+    seeking = false;
+    ringEl.classList.remove("dragging");
+    seek(dragP * state.duration);
+  };
+  on(ringEl, "pointerup", endDrag);
+  on(ringEl, "pointercancel", endDrag);
 
   on($("play"), "click", e => { e.stopPropagation(); toggle(); });
   on($("prevBar"), "click", () => stepBar(-1));
@@ -511,6 +618,7 @@ export function createEngine(root: HTMLElement, SONGS: Song[], navigate: (href: 
     else if (e.key === "ArrowLeft") { e.preventDefault(); stepBar(-1); }
     else if (e.key === "ArrowRight") { e.preventDefault(); stepBar(1); }
     else if (e.key === "Escape") closeOverlays();
+    else if (e.key === "l" || e.key === "L") $("loopBtn").click();
   });
   // A focused button would also click on Space's keyup.
   on(document, "keyup", e => e.code === "Space" && e.target.closest("button") && e.preventDefault());
@@ -523,7 +631,7 @@ export function createEngine(root: HTMLElement, SONGS: Song[], navigate: (href: 
   type Toggle = { values: any[]; get: () => any; set: (v: any) => void; label: (v: any) => string; name: (v: any) => string; on: (v: any) => boolean };
   const TOGGLES: Record<string, Toggle> = {
     speed: {
-      values: [1, 0.75, 0.5], get: () => state.speed, set: setSpeed,
+      values: [1, 0.75, 0.5, 1.25, 1.5], get: () => state.speed, set: setSpeed,
       label: v => `${String(v).replace(/^0/, "")}×`, name: v => `Speed ${v * 100}%`, on: v => v !== 1,
     },
     names: {
@@ -541,6 +649,11 @@ export function createEngine(root: HTMLElement, SONGS: Song[], navigate: (href: 
       label: v => `L${(state.song?.levels || []).indexOf(v) + 1}`,
       name: v => `Level ${(state.song?.levels || []).indexOf(v) + 1}: left hand ` + (LEVELS[v] || v),
       on: v => v !== state.song?.level,
+    },
+    loop: {
+      values: ["", "all", "row", "bar"], get: () => state.loop, set: setLoop,
+      label: v => `<svg><use href="#i-loop"/></svg>` + (v === "row" || v === "bar" ? `<span class="tog-badge">${v}</span>` : ""),
+      name: v => "Loop " + ({ "": "off", all: "the whole song", row: "this row", bar: "this bar" } as any)[v], on: v => !!v,
     },
     source: {
       values: ["sheet", "original", "both"], get: () => state.source, set: setSource,
@@ -575,13 +688,16 @@ export function createEngine(root: HTMLElement, SONGS: Song[], navigate: (href: 
   // The bar's height places the video card and "Back to current" above it.
   observe($("bar"), () => document.documentElement.style.setProperty("--bar-h", $("bar").offsetHeight + "px"));
 
-  // ---------- Library and video ----------
+  // ---------- Song menu and video ----------
 
-  const setLibrary = (open: boolean) => body.classList.toggle("lib-open", open);
-  function closeOverlays() { setLibrary(false); }
-  on($("scrim"), "click", closeOverlays);
-  on($("libOpen"), "click", () => setLibrary(true));
-  on($("libClose"), "click", () => setLibrary(false));
+  // The song's title in the bar opens the song list above it.
+  function setMenu(open: boolean) {
+    $("songMenu").hidden = !open;
+    $("songBtn").setAttribute("aria-expanded", String(open));
+  }
+  function closeOverlays() { setMenu(false); }
+  on($("songBtn"), "click", () => setMenu($("songMenu").hidden));
+  on(document, "pointerdown", e => !$("songMenu").hidden && !e.target.closest("#songMenu, #songBtn") && setMenu(false));
 
   function setVideoOpen(open: boolean) {
     $("now").hidden = !open;
@@ -644,7 +760,7 @@ export function createEngine(root: HTMLElement, SONGS: Song[], navigate: (href: 
         row.textContent = versionOf(s);
         row.addEventListener("click", () => {
           if (s !== state.song) navigate(hrefOf(s));
-          setLibrary(false);
+          setMenu(false);
         });
         group.appendChild(row);
       });
@@ -666,7 +782,6 @@ export function createEngine(root: HTMLElement, SONGS: Song[], navigate: (href: 
     $("title").textContent = song.name;
     $("meta").textContent = [versionOf(song), time, bpm && `♩ = ${bpm}`].filter(Boolean).join(" · ");
     $("npName").textContent = song.name;
-    $("npSub").textContent = versionOf(song);
     document.title = `${song.name} · Piano sheet`;
     root.querySelectorAll(".row").forEach(r => r.setAttribute("aria-current", String((r as HTMLElement).dataset.song === song.name)));
   }
@@ -756,6 +871,7 @@ export function createEngine(root: HTMLElement, SONGS: Song[], navigate: (href: 
       offs.forEach(off => off());
       clearTimeout(resizeTimer);
       clearTimeout(toastTimer);
+      clearTimeout(loopWait);
       cancelAnimationFrame(raf);
     },
   };

@@ -1,5 +1,5 @@
 /* Sheet-first player: the sheet fills the screen, the controls float over it at the bottom,
-   the library slides in from ☰ (top left) and the video is a small floating card.
+   the song list opens from the title in the bar and the video is a small floating card.
    Every control in the bar is a plain icon that steps to its next option on one click. */
 
 :root {
@@ -67,6 +67,12 @@ h1, h2, p { margin: 0; }
   border-radius: 50%; background: currentColor;
 }
 .tog { font-size: 13px; font-weight: 800; letter-spacing: -.01em; font-variant-numeric: tabular-nums; }
+#speedBtn { font-size: 12px; letter-spacing: -.05em; }  /* "1.25×" fits the button */
+/* Which loop is on (row / bar), in the toggle's corner. */
+.tog-badge {
+  position: absolute; top: 3px; right: 0; padding: 0 3px; border-radius: 4px; background: var(--accent); color: #fff;
+  font-size: 8px; line-height: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .02em;
+}
 .pill { height: 36px; padding: 0 14px; border-radius: 999px; font-weight: 600; white-space: nowrap; }
 @media (pointer: coarse) { .icon { width: 44px; height: 44px; } .pill { height: 44px; } }
 
@@ -74,9 +80,8 @@ h1, h2, p { margin: 0; }
 .sheet-pane { position: relative; height: 100dvh; display: flex; flex-direction: column; padding: var(--safe-t) var(--safe-r) 0 var(--safe-l); }
 .sheet-head {
   display: flex; align-items: baseline; gap: 10px; min-width: 0;
-  padding: 10px 16px 10px 8px; max-width: 1272px; width: 100%; margin: 0 auto;
+  padding: 10px 16px; max-width: 1272px; width: 100%; margin: 0 auto;
 }
-.sheet-head .icon { align-self: center; }
 .sheet-head h1 { font-size: 17px; font-weight: 800; letter-spacing: -.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 #meta { color: var(--muted); font-weight: 600; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .scroller { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 0 16px 50vh; overscroll-behavior: contain; }
@@ -90,25 +95,25 @@ body.playing #score g.system:not(.current) { opacity: .38; }
 g.playing, g.playing * { fill: var(--accent) !important; stroke: var(--accent) !important; }
 text.note-name { fill: #2a6fb0; font-family: system-ui, sans-serif; }
 text.note-name.playing { fill: var(--accent); font-weight: bold; }
+/* A row or bar loop: the bars outside it fade back. */
+#score g.measure { transition: opacity .25s; }
+body[data-loop="row"] #score g.measure:not(.in-loop), body[data-loop="bar"] #score g.measure:not(.in-loop) { opacity: .3; }
 /* One hand on: the other hand's staff and names fade back. */
 body[data-hand="right"] #score .left, body[data-hand="left"] #score .right { opacity: .3; }
 .back-pill { position: absolute; left: 50%; bottom: calc(var(--bar-h) + 28px + var(--safe-b)); transform: translateX(-50%); box-shadow: inset 0 0 0 1px var(--glass-edge), inset 0 1.5px 0 var(--glass-hi), 0 6px 20px rgba(0, 0, 0, .25); }
 
 
-/* ---------- Library drawer ---------- */
-.library {
-  position: fixed; z-index: 40; top: calc(8px + var(--safe-t)); bottom: calc(8px + var(--safe-b)); left: calc(8px + var(--safe-l)); width: min(300px, 85vw);
-  display: flex; flex-direction: column; background: var(--panel); border-radius: 14px;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, .6);
-  transform: translateX(calc(-100% - 16px)); visibility: hidden; transition: transform .28s ease, visibility .28s;
+/* ---------- Song menu: opens upward from the title in the bar ---------- */
+.menu {
+  position: absolute; left: 0; bottom: calc(100% + 10px); width: min(340px, 100%);
+  max-height: calc(100dvh - var(--bar-h) - 48px - var(--safe-t) - var(--safe-b));
+  display: flex; flex-direction: column; background: rgba(24, 24, 24, .97); border-radius: 16px;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .1), 0 20px 60px rgba(0, 0, 0, .6);
 }
-body.lib-open .library { transform: none; visibility: visible; }
-.panel-head { display: flex; align-items: center; gap: 8px; padding: 10px 8px 4px 18px; }
-.panel-head h2 { font-size: 15px; font-weight: 700; flex: 1; }
-#songs { flex: 1; overflow-y: auto; padding: 4px 8px 16px; }
-.group { margin-top: 8px; }
+#songs { flex: 1; overflow-y: auto; padding: 4px 8px 8px; }
+.group { margin-top: 4px; }
 .group-name { display: flex; align-items: center; gap: 10px; padding: 8px 10px; font-weight: 700; }
-.group-name .thumb { width: 40px; height: 40px; }
+.group-name .thumb { width: 40px; height: 40px; border-radius: 50%; }
 .row {
   display: flex; width: 100%; text-align: left; align-items: center; gap: 10px;
   padding: 9px 12px 9px 60px; border-radius: 10px; color: var(--muted); font-weight: 600;
@@ -117,10 +122,7 @@ body.lib-open .library { transform: none; visibility: visible; }
 .row[aria-current="true"] { color: var(--accent); }
 .row[aria-current="true"]::after { content: "♪"; margin-left: auto; }
 @media (pointer: coarse) { .row { min-height: 44px; } }
-.hint { color: var(--muted); font-size: 12px; padding: 12px 18px 16px; }
-
-.scrim { position: fixed; inset: 0; z-index: 30; background: rgba(0, 0, 0, .5); opacity: 0; pointer-events: none; transition: opacity .25s; }
-body.lib-open .scrim { opacity: 1; pointer-events: auto; }
+.hint { color: var(--muted); font-size: 12px; padding: 10px 18px 14px; border-top: 1px solid rgba(255, 255, 255, .08); }
 
 /* ---------- Video card: floats bottom right, drag it anywhere ---------- */
 .now {
@@ -147,31 +149,74 @@ body.no-video .no-video { display: grid; }
 .bar {
   position: fixed; z-index: 25; left: 50%; bottom: calc(16px + var(--safe-b));
   transform: translateX(-50%); width: min(880px, calc(100vw - 32px - 2 * var(--safe-x)));
-  display: grid; align-items: center; gap: 16px; padding: 10px 14px 10px 10px; border-radius: 18px;
-  grid-template-columns: minmax(0, 1fr) minmax(280px, 1.4fr) minmax(0, 1fr);
+  display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 14px;
+  padding: 8px 14px 8px 8px; border-radius: 48px;
   --glass-fill: rgba(30, 30, 30, .72); --glass-edge: rgba(255, 255, 255, .14); --glass-hi: rgba(255, 255, 255, .2);
   box-shadow: inset 0 0 0 1px var(--glass-edge), inset 0 1.5px 0 var(--glass-hi), 0 16px 40px rgba(0, 0, 0, .45);
 }
 @media (hover: hover) { .bar.glass:hover { --glass-fill: rgba(30, 30, 30, .72); } }
-.np { display: flex; align-items: center; gap: 12px; min-width: 0; }
-.np-text { display: flex; flex-direction: column; min-width: 0; }
-.np-text b, .np-text small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.np-text small { color: var(--muted); font-weight: 600; }
 .thumb { width: 48px; height: 48px; border-radius: 8px; background: #282828; display: grid; place-items: center; overflow: hidden; flex: none; color: var(--muted); }
 .thumb img { width: 100%; height: 100%; object-fit: cover; display: none; }
 .thumb.has-img img { display: block; }
 .thumb.has-img svg { display: none; }
 
-.transport { display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 0; }
-.buttons { display: flex; align-items: center; gap: 12px; }
-.play { width: 44px; height: 44px; background: #fff; color: #111; transition: transform .1s; }
-.play:active { transform: scale(.94); }
-.play:focus-visible { outline: 2px solid rgba(255, 255, 255, .5); outline-offset: 2px; }
-.play .i-pause, body.playing .play .i-play { display: none; }
-body.playing .play .i-pause { display: block; }
-.seek { display: flex; align-items: center; gap: 10px; width: 100%; font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
-.seek span { min-width: 32px; }
-.seek span:first-child { text-align: right; }
+/* The disc: the song's picture as a record, spinning while it plays, with play/pause on top.
+   The ring around it is the seek bar (drag the knob or tap anywhere on it). */
+.disc { --size: 72px; position: relative; width: var(--size); height: var(--size); flex: none; border-radius: 50%; touch-action: none; cursor: pointer; }
+.disc:focus-visible { outline: 2px solid rgba(255, 255, 255, .5); outline-offset: 2px; }
+.ring { position: absolute; inset: 0; width: 100%; height: 100%; transform: rotate(-90deg); pointer-events: none; }
+.ring circle { fill: none; stroke-width: 3; }
+.ring-track { stroke: rgba(255, 255, 255, .18); }
+.ring-fill { stroke: #fff; stroke-dasharray: 100; stroke-dashoffset: 100; stroke-linecap: round; transition: stroke .15s; }
+.disc:hover .ring-fill, .disc.dragging .ring-fill, .disc:focus-visible .ring-fill { stroke: var(--accent); }
+.ring-knob { position: absolute; inset: 0; pointer-events: none; }
+.ring-knob i {
+  position: absolute; left: 50%; top: calc(3 / 72 * 100%); width: 10px; height: 10px; margin: -5px 0 0 -5px;
+  border-radius: 50%; background: #fff; opacity: 0; transition: opacity .15s;
+}
+.disc:hover .ring-knob i, .disc.dragging .ring-knob i, .disc:focus-visible .ring-knob i { opacity: 1; }
+.disc-btn { position: absolute; inset: 9px; border-radius: 50%; overflow: hidden; transition: transform .1s; }
+.disc-btn:active { transform: scale(.95); }
+.disc-btn:focus-visible { outline: 2px solid rgba(255, 255, 255, .5); outline-offset: 2px; }
+.art {
+  width: 100%; height: 100%; border-radius: 50%; position: relative; background: #111;
+  animation: spin 8s linear infinite paused;
+}
+body.playing .art { animation-play-state: running; }
+@keyframes spin { to { transform: rotate(1turn); } }
+/* Grooves turn with the picture; the shine (on the button) stays still, like light on a record. */
+.art::after {
+  content: ""; position: absolute; inset: 0; border-radius: 50%;
+  background:
+    repeating-radial-gradient(circle, transparent 0 1.6px, rgba(0, 0, 0, .2) 1.6px 2.4px),
+    radial-gradient(circle, transparent 0 28%, rgba(0, 0, 0, .4) 100%);
+}
+.disc-btn::after {
+  content: ""; position: absolute; inset: 0; border-radius: 50%; pointer-events: none;
+  background: conic-gradient(from 20deg, transparent, rgba(255, 255, 255, .14) 8%, transparent 18%, transparent 50%, rgba(255, 255, 255, .14) 58%, transparent 68%);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .12);
+}
+.disc-icon {
+  position: absolute; inset: 0; margin: auto; width: 30px; height: 30px; border-radius: 50%; z-index: 1;
+  display: grid; place-items: center; background: rgba(0, 0, 0, .6); color: #fff; transition: opacity .15s;
+}
+.disc-icon svg { width: 16px; height: 16px; }
+.disc-icon .i-pause, body.playing .disc-icon .i-play { display: none; }
+body.playing .disc-icon .i-pause { display: block; }
+/* Playing: the record shows clean, the pause icon comes back on hover. */
+@media (hover: hover) {
+  body.playing .disc-icon { opacity: 0; }
+  body.playing .disc-btn:hover .disc-icon, body.playing .disc-btn:focus-visible .disc-icon { opacity: 1; }
+}
+
+.np { display: flex; flex-direction: column; align-items: flex-start; min-width: 0; }
+.np-title { display: flex; align-items: center; gap: 4px; max-width: 100%; padding: 2px 6px; margin-left: -6px; border-radius: 8px; }
+.np-title b { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 15px; }
+.np-title svg { width: 18px; height: 18px; color: var(--muted); transition: transform .2s; }
+.np-title[aria-expanded="true"] svg { transform: rotate(180deg); }
+@media (hover: hover) { .np-title:hover { background: rgba(255, 255, 255, .08); } }
+.np-title:focus-visible { outline: 2px solid rgba(255, 255, 255, .5); outline-offset: -2px; }
+.np-time { color: var(--muted); font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; }
 
 .side { display: flex; align-items: center; justify-content: flex-end; gap: 2px; min-width: 0; }
 .volume { display: flex; align-items: center; }
@@ -214,36 +259,29 @@ input[type="range"]:focus-visible { outline: none; }
 }
 
 
-/* ---------- Tablet: no volume slider, no song name ---------- */
+/* ---------- Tablet: no volume slider ---------- */
 @media (max-width: 1099px) {
   .volume input { display: none; }
-  .bar { grid-template-columns: auto minmax(220px, 1fr) auto; }
-  .np-text { display: none; }
 }
 
-/* ---------- Phone: seek on top, everything else in one row under it ---------- */
+/* ---------- Phone: disc and title on top, the tools in a row under them ---------- */
 @media (max-width: 699px) {
-  .sheet-head { padding: 6px 12px 6px 4px; }
+  .sheet-head { padding: 6px 12px; }
   .sheet-head h1 { font-size: 15px; }
   .scroller { padding: 0 8px 50vh; }
   .paper { padding: 4px 6px; border-radius: 10px; }
   .bar {
     width: calc(100vw - 16px - 2 * var(--safe-x)); bottom: calc(8px + var(--safe-b));
-    grid-template: "seek seek seek seek seek seek seek" auto "speed names hand mid level source video" auto / auto auto auto 1fr auto auto auto;
-    gap: 0; padding: 6px 6px 8px;
+    grid-template: "disc np" auto "side side" auto / auto minmax(0, 1fr);
+    gap: 2px 12px; padding: 8px 6px 6px 8px; border-radius: 24px;
   }
-  .np, .volume { display: none; }
-  .transport, .side { display: contents; }
-  .seek { grid-area: seek; padding: 0 8px; }
-  .buttons { grid-area: mid; justify-self: center; gap: 2px; }
-  /* Seven toggles and the transport in one row on a 375px phone: narrower, still 44px tall. */
-  .side .icon { width: 36px; }
-  #speedBtn { grid-area: speed; }
-  #namesBtn { grid-area: names; }
-  #handBtn { grid-area: hand; }
-  #levelBtn { grid-area: level; }
-  #sourceBtn { grid-area: source; }
-  #videoBtn { grid-area: video; }
+  .disc { --size: 60px; grid-area: disc; }
+  .disc-btn { inset: 7px; }
+  .np { grid-area: np; }
+  .side { grid-area: side; justify-content: space-between; }
+  .volume { display: none; }
+  .side .icon { width: 40px; min-width: 0; flex-shrink: 1; }  /* nine tools fit a 375px phone */
+  .menu { width: 100%; }
   .now { width: 140px; right: calc(8px + var(--safe-r)); bottom: calc(var(--bar-h) + 20px + var(--safe-b)); }
 }
 

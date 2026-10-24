@@ -42,18 +42,8 @@ const Markup = memo(function Markup() {
     <>
       <Icons />
 
-      <aside className="library" id="library" aria-label="Library">
-        <div className="panel-head">
-          <h2>Library</h2>
-          <button className="btn icon" id="libClose" aria-label="Close library"><svg><use href="#i-close"/></svg></button>
-        </div>
-        <nav id="songs"></nav>
-        <p className="hint">Red = notes playing now. Tap a note to jump to it.<br/>The sheet is auto-transcribed — trust your ears.</p>
-      </aside>
-
       <main className="sheet-pane">
         <header className="sheet-head">
-          <button className="btn icon" id="libOpen" aria-label="Library" title="Library"><svg><use href="#i-menu"/></svg></button>
           <h1 id="title">Loading…</h1>
           <p id="meta"></p>
         </header>
@@ -72,23 +62,26 @@ const Markup = memo(function Markup() {
       </div>
 
       <footer className="bar glass" id="bar">
-        <div className="np">
-          <span className="thumb"><img id="thumb" alt=""/><svg><use href="#i-note"/></svg></span>
-          <span className="np-text"><b id="npName"></b><small id="npSub"></small></span>
+        {/* The disc is play/pause and spins while playing; the ring around it is the seek bar. */}
+        <div className="disc" id="ring" role="slider" tabIndex={0} aria-label="Seek" aria-valuemin={0} aria-valuemax={100} aria-valuenow={0}>
+          <svg className="ring" viewBox="0 0 72 72" aria-hidden="true">
+            <circle className="ring-track" cx="36" cy="36" r="33"/>
+            <circle className="ring-fill" id="ringFill" cx="36" cy="36" r="33" pathLength="100"/>
+          </svg>
+          <span className="ring-knob" id="ringKnob"><i/></span>
+          <button className="disc-btn" id="play" aria-label="Play / pause" title="Play / pause (Space)">
+            <span className="thumb art"><img alt=""/></span>
+            <span className="disc-icon"><svg className="i-play"><use href="#i-play"/></svg><svg className="i-pause"><use href="#i-pause"/></svg></span>
+          </button>
         </div>
-        <div className="transport">
-          <div className="buttons">
-            <button className="btn icon" id="prevBar" aria-label="Back one bar" title="Back one bar (←)"><svg><use href="#i-prev"/></svg></button>
-            <button className="icon play" id="play" aria-label="Play" title="Play / pause (Space)"><svg className="i-play"><use href="#i-play"/></svg><svg className="i-pause"><use href="#i-pause"/></svg></button>
-            <button className="btn icon" id="nextBar" aria-label="Forward one bar" title="Forward one bar (→)"><svg><use href="#i-next"/></svg></button>
-          </div>
-          <div className="seek">
-            <span id="timeNow">0:00</span>
-            <input type="range" id="seek" min="0" max="1000" defaultValue="0" step="1" aria-label="Seek"/>
-            <span id="timeEnd">0:00</span>
-          </div>
+        <div className="np">
+          <button className="np-title" id="songBtn" aria-haspopup="true" aria-expanded="false" aria-controls="songMenu" title="Switch song"><b id="npName"></b><svg><use href="#i-chevron"/></svg></button>
+          <small className="np-time"><span id="timeNow">0:00</span> / <span id="timeEnd">0:00</span></small>
         </div>
         <div className="side">
+          <button className="btn icon" id="prevBar" aria-label="Back one bar" title="Back one bar (←)"><svg><use href="#i-prev"/></svg></button>
+          <button className="btn icon" id="nextBar" aria-label="Forward one bar" title="Forward one bar (→)"><svg><use href="#i-next"/></svg></button>
+          <button className="btn icon tog" id="loopBtn" data-tog="loop"></button>
           <button className="btn icon tog" id="speedBtn" data-tog="speed"></button>
           <button className="btn icon tog" id="namesBtn" data-tog="names"></button>
           <button className="btn icon tog" id="handBtn" data-tog="hand"></button>
@@ -100,10 +93,14 @@ const Markup = memo(function Markup() {
           </div>
           <button className="btn icon tog" id="videoBtn" aria-label="Video" title="Show / hide the video"><svg><use href="#i-video"/></svg></button>
         </div>
+        <div className="menu" id="songMenu" hidden>
+          <nav id="songs" aria-label="Songs"></nav>
+          <p className="hint">Red = notes playing now. Tap a note to jump to it.<br/>The sheet is auto-transcribed — trust your ears.</p>
+        </div>
         <div className="toast" id="toast" aria-live="polite"></div>
       </footer>
-      <div className="scrim" id="scrim"></div>
-      <midi-player id="player" sound-font="" hidden></midi-player>
+      {/* Salamander: a sampled Yamaha grand with 16 loudness layers (the default has 8). */}
+      <midi-player id="player" sound-font="https://storage.googleapis.com/magentadata/js/soundfonts/salamander" hidden></midi-player>
     </>
   );
 });
