@@ -82,7 +82,7 @@ const Markup = memo(function Markup() {
         </div>
         <div className="side">
           {/* .more: left out of the bar on a tablet (the panel still has them). */}
-          <button className="btn icon" id="prevBar" aria-label="Back one bar" title="Back one bar (←)"><svg><use href="#i-prev"/></svg><span className="cap">Back a bar</span></button>
+          <button className="btn icon" id="prevBar" aria-label="Back one bar" title="Back one bar (←), double-click to go to the start"><svg><use href="#i-prev"/></svg><span className="cap">Back a bar</span></button>
           <button className="btn icon" id="nextBar" aria-label="Forward one bar" title="Forward one bar (→)"><svg><use href="#i-next"/></svg><span className="cap">Next bar</span></button>
           <button className="btn icon tog" id="loopBtn" data-tog="loop"></button>
           <button className="btn icon tog" id="speedBtn" data-tog="speed"></button>

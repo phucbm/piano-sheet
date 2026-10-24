@@ -876,6 +876,7 @@ export function createEngine(root: HTMLElement, SONGS: Song[], navigate: (href: 
 
   on($("play"), "click", e => { e.stopPropagation(); toggle(); });
   on($("prevBar"), "click", () => stepBar(-1));
+  on($("prevBar"), "dblclick", () => seek(0));
   on($("nextBar"), "click", () => stepBar(1));
 
   on(document, "keydown", e => {
