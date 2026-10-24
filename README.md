@@ -21,19 +21,24 @@ them. It works on phone, tablet and desktop.
 uv sync
 mkdir -p models && curl -L -o models/piano_crnn.pth "https://zenodo.org/record/4034264/files/CRNN_note_F1%3D0.9677_pedal_F1%3D0.9186.pth?download=1"
 scripts/run.sh input/song.mp4               # -> output/song.musicxml + .mid
-scripts/run.sh input/song.mp4 --transpose -6 --easy  # easy version (set N so it lands in C)
+scripts/run.sh input/song.mp4 --transpose -6 --easy  # easy version in 4 levels (set N so it lands in C)
 pnpm install && pnpm dev                     # player on http://localhost:8000
 uv run python scripts/check_highlight.py output/song.musicxml  # player highlights every note
 ```
 
 `to_sheet.py` options: `--split 60` (pitch where the right hand starts), `--shift N`
 (move bar lines by N sixteenths), `--half` (slow song, tracked beat = eighth), `--transpose N`,
-`--easy` (right hand as played, left hand = ballad 1-5-8-10 on guessed chords, chord names on top).
+`--easy` (right hand as played, left hand on guessed chords of the key, one per bar unless the
+second half clearly changes, chord names on top). It writes one sheet per left-hand level,
+`<out>.<level>.*`, easiest first: `root` (one held note), `fifth` (root + fifth held), `broken`
+(1-5-8-5 in quarters), `ballad` (1-5-8-10-8-5-8-5 in eighths).
 
 To add a song to the player, put `output/<name>.musicxml` and `output/<name>.timing.json`
 (both written by `to_sheet.py`) and the recording `output/<audio>.wav` in place, and add it to
 `songs.json`: `{ "name": "<name>", "audio": "<audio>.wav", "video": "<file in input/>", "source": "" }`
-(leave out `video` if there is none). Then `scripts/thumb.sh <name>` makes the picture shown when
+(leave out `video` if there is none). For an easy version add
+`"levels": ["root", "fifth", "broken", "ballad"], "level": "fifth"` (the levels it has, and the one
+a link opens with); the player's L1–L4 button switches between them. Then `scripts/thumb.sh <name>` makes the picture shown when
 the song's link is shared. The timing file gives the recording time of every sixteenth on the
 sheet, so the video stays in step even though the sheet plays at one fixed tempo. Every song gets
 its own page, `/song/<name>/`; `pnpm dev` and `pnpm build` copy the files it uses into `public/media/`.

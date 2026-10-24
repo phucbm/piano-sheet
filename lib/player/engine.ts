@@ -43,7 +43,7 @@ export function createEngine(root: HTMLElement, SONGS: Song[], navigate: (href: 
   // the chosen speed, runs pos / speed; the recording runs toRec(pos).
   const state = {
     song: null as Song | null, xml: "", timing: null as Timing | null, duration: 0,
-    speed: 1, names: params.get("names") || "", hand: params.get("hand") || "", source: "sheet", volume: 0.8, muted: false,
+    speed: 1, names: params.get("names") || "", hand: params.get("hand") || "", level: params.get("level") || "", source: "sheet", volume: 0.8, muted: false,
     playing: false, pos: 0, follow: true,
   };
   let tk: any, lastIds: string[] = [], measures: { pos: number; id: string }[] = [], currentSystem: Element | null = null, raf = 0;
@@ -472,6 +472,14 @@ export function createEngine(root: HTMLElement, SONGS: Song[], navigate: (href: 
   on(volumeEl, "input", () => { state.volume = +volumeEl.value; state.muted = false; applyVolume(); });
   on($("mute"), "click", () => { state.muted = !state.muted; if (!state.volume) state.volume = 0.8; applyVolume(); });
 
+  // Easy songs: step through the left-hand levels, staying at the same place in the song.
+  async function setLevel(level: string) {
+    const was = state.playing;
+    state.level = level;
+    await load(state.song!, true);
+    if (was && state.level === level) { await midiReady; play(); }
+  }
+
   // ---------- Bar ----------
 
   let seeking = false;
@@ -509,6 +517,9 @@ export function createEngine(root: HTMLElement, SONGS: Song[], navigate: (href: 
 
   // Toggles: one click steps to the next option, the button shows the current one, and a
   // short toast above the bar says what it switched to.
+  const LEVELS: Record<string, string> = {  // same as LEVELS in scripts/to_sheet.py
+    root: "root notes", fifth: "root + fifth", broken: "broken 1-5-8-5", ballad: "ballad 1-5-8-10",
+  };
   type Toggle = { values: any[]; get: () => any; set: (v: any) => void; label: (v: any) => string; name: (v: any) => string; on: (v: any) => boolean };
   const TOGGLES: Record<string, Toggle> = {
     speed: {
@@ -524,6 +535,12 @@ export function createEngine(root: HTMLElement, SONGS: Song[], navigate: (href: 
       values: ["", "right", "left"], get: () => state.hand, set: setHand,
       label: v => ({ "": "LR", right: "R", left: "L" } as any)[v],
       name: v => ({ "": "Both hands", right: "Right hand only", left: "Left hand only" } as any)[v], on: v => !!v,
+    },
+    level: {
+      get values() { return state.song?.levels || []; }, get: () => state.level, set: setLevel,
+      label: v => `L${(state.song?.levels || []).indexOf(v) + 1}`,
+      name: v => `Level ${(state.song?.levels || []).indexOf(v) + 1}: left hand ` + (LEVELS[v] || v),
+      on: v => v !== state.song?.level,
     },
     source: {
       values: ["sheet", "original", "both"], get: () => state.source, set: setSource,
@@ -583,10 +600,12 @@ export function createEngine(root: HTMLElement, SONGS: Song[], navigate: (href: 
       start = { x: e.clientX - r.left, y: e.clientY - r.top };
       card.setPointerCapture(e.pointerId);
     });
+    // The safe areas (--safe-* in globals.css): keep the card off the notch and home bar.
+    const safe = (side: string) => parseFloat(getComputedStyle(document.documentElement).getPropertyValue(`--safe-${side}`)) || 0;
     on(card, "pointermove", e => {
       if (!start) return;
-      const x = clamp(e.clientX - start.x, 8, innerWidth - card.offsetWidth - 8);
-      const y = clamp(e.clientY - start.y, 8, innerHeight - card.offsetHeight - 8);
+      const x = clamp(e.clientX - start.x, 8 + safe("l"), innerWidth - card.offsetWidth - 8 - safe("r"));
+      const y = clamp(e.clientY - start.y, 8 + safe("t"), innerHeight - card.offsetHeight - 8 - safe("b"));
       Object.assign(card.style, { left: x + "px", top: y + "px", right: "auto", bottom: "auto" });
     });
     on(card, "pointerup", () => start = null);
@@ -595,9 +614,16 @@ export function createEngine(root: HTMLElement, SONGS: Song[], navigate: (href: 
 
   // ---------- Songs ----------
 
-  // The page for a song, keeping the note names and hand.
+  // An easy song's level: the one asked for if it has it, else its default. "" for other songs.
+  const levelOf = (song: Song, level = state.level) =>
+    !song.levels ? "" : song.levels.includes(level) ? level : song.level || song.levels[0];
+  // The sheet's files: <name>.<level>.* for an easy song, <name>.* otherwise.
+  const fileOf = (song: Song) => state.level ? `${song.name}.${state.level}` : song.name;
+
+  // The page for a song, keeping the note names, hand and (if not the default) level.
   function hrefOf(song: Song) {
-    const q = new URLSearchParams(Object.entries({ names: state.names, hand: state.hand }).filter(([, v]) => v));
+    const level = levelOf(song) === song.level ? "" : levelOf(song);
+    const q = new URLSearchParams(Object.entries({ names: state.names, hand: state.hand, level }).filter(([, v]) => v));
     return `/song/${song.name}/` + (q.size ? "?" + q : "");
   }
 
@@ -645,17 +671,22 @@ export function createEngine(root: HTMLElement, SONGS: Song[], navigate: (href: 
     root.querySelectorAll(".row").forEach(r => r.setAttribute("aria-current", String((r as HTMLElement).dataset.song === song.name)));
   }
 
-  async function load(song: Song) {
+  // keepPos: same song, another level; carry on from the same place.
+  async function load(song: Song, keepPos = false) {
     pause();
     const sameMedia = state.song && baseOf(state.song) === baseOf(song) && state.song.video === song.video;
     state.song = song;
-    state.pos = 0;
+    state.level = levelOf(song);
+    if (!keepPos) state.pos = 0;
+    const level = state.level;
+    $("levelBtn").hidden = !song.levels;
+    updateToggles();
     updateUrl();
     const [xml, timing] = await Promise.all([
-      fetch(media(`${song.name}.musicxml`)).then(r => r.ok ? r.text() : null).catch(() => null),
-      fetch(media(`${song.name}.timing.json`)).then(r => r.ok ? r.json() : null).catch(() => null),
+      fetch(media(`${fileOf(song)}.musicxml`)).then(r => r.ok ? r.text() : null).catch(() => null),
+      fetch(media(`${fileOf(song)}.timing.json`)).then(r => r.ok ? r.json() : null).catch(() => null),
     ]);
-    if (state.song !== song || destroyed) return;
+    if (state.song !== song || state.level !== level || destroyed) return;
     if (!xml) {  // offline, and the song hasn't been opened before (see sw/sw.ts)
       state.xml = "";
       showMeta(song);
@@ -672,7 +703,7 @@ export function createEngine(root: HTMLElement, SONGS: Song[], navigate: (href: 
     }
     render();
     setFollow(true);
-    if (hasMedia() && video.readyState) video.currentTime = Math.max(0, toRec(0));
+    if (hasMedia() && video.readyState) video.currentTime = Math.max(0, toRec(state.pos));
   }
 
   // The video's frame at the first note is the song's thumbnail.

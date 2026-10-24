@@ -10,6 +10,11 @@
   --accent: #e8442e;
   --paper: #fbfaf7;
   --bar-h: 88px;  /* set from the bar's real height by player.js */
+  /* The notch, status bar and home bar on iPhone (the installed app runs full screen). The bar
+     is centred, so it keeps clear of whichever side has the notch on both sides. */
+  --safe-t: env(safe-area-inset-top, 0px); --safe-b: env(safe-area-inset-bottom, 0px);
+  --safe-l: env(safe-area-inset-left, 0px); --safe-r: env(safe-area-inset-right, 0px);
+  --safe-x: max(var(--safe-l), var(--safe-r));
   color-scheme: dark;
 }
 
@@ -66,7 +71,7 @@ h1, h2, p { margin: 0; }
 @media (pointer: coarse) { .icon { width: 44px; height: 44px; } .pill { height: 44px; } }
 
 /* ---------- Sheet (the whole screen) ---------- */
-.sheet-pane { position: relative; height: 100dvh; display: flex; flex-direction: column; }
+.sheet-pane { position: relative; height: 100dvh; display: flex; flex-direction: column; padding: var(--safe-t) var(--safe-r) 0 var(--safe-l); }
 .sheet-head {
   display: flex; align-items: baseline; gap: 10px; min-width: 0;
   padding: 10px 16px 10px 8px; max-width: 1272px; width: 100%; margin: 0 auto;
@@ -87,12 +92,12 @@ text.note-name { fill: #2a6fb0; font-family: system-ui, sans-serif; }
 text.note-name.playing { fill: var(--accent); font-weight: bold; }
 /* One hand on: the other hand's staff and names fade back. */
 body[data-hand="right"] #score .left, body[data-hand="left"] #score .right { opacity: .3; }
-.back-pill { position: absolute; left: 50%; bottom: calc(var(--bar-h) + 28px); transform: translateX(-50%); box-shadow: inset 0 0 0 1px var(--glass-edge), inset 0 1.5px 0 var(--glass-hi), 0 6px 20px rgba(0, 0, 0, .25); }
+.back-pill { position: absolute; left: 50%; bottom: calc(var(--bar-h) + 28px + var(--safe-b)); transform: translateX(-50%); box-shadow: inset 0 0 0 1px var(--glass-edge), inset 0 1.5px 0 var(--glass-hi), 0 6px 20px rgba(0, 0, 0, .25); }
 
 
 /* ---------- Library drawer ---------- */
 .library {
-  position: fixed; z-index: 40; top: 8px; bottom: 8px; left: 8px; width: min(300px, 85vw);
+  position: fixed; z-index: 40; top: calc(8px + var(--safe-t)); bottom: calc(8px + var(--safe-b)); left: calc(8px + var(--safe-l)); width: min(300px, 85vw);
   display: flex; flex-direction: column; background: var(--panel); border-radius: 14px;
   box-shadow: 0 20px 60px rgba(0, 0, 0, .6);
   transform: translateX(calc(-100% - 16px)); visibility: hidden; transition: transform .28s ease, visibility .28s;
@@ -119,7 +124,7 @@ body.lib-open .scrim { opacity: 1; pointer-events: auto; }
 
 /* ---------- Video card: floats bottom right, drag it anywhere ---------- */
 .now {
-  position: fixed; z-index: 20; right: 16px; bottom: calc(var(--bar-h) + 28px); width: 220px;
+  position: fixed; z-index: 20; right: calc(16px + var(--safe-r)); bottom: calc(var(--bar-h) + 28px + var(--safe-b)); width: 220px;
   padding: 6px; border-radius: 16px; touch-action: none; cursor: grab;
   --glass-fill: rgba(30, 30, 30, .72); --glass-edge: rgba(255, 255, 255, .14); --glass-hi: rgba(255, 255, 255, .2);
   box-shadow: inset 0 0 0 1px var(--glass-edge), inset 0 1.5px 0 var(--glass-hi), 0 16px 40px rgba(0, 0, 0, .5);
@@ -140,8 +145,8 @@ body.no-video .no-video { display: grid; }
 
 /* ---------- Floating controller ---------- */
 .bar {
-  position: fixed; z-index: 25; left: 50%; bottom: calc(16px + env(safe-area-inset-bottom));
-  transform: translateX(-50%); width: min(880px, calc(100vw - 32px));
+  position: fixed; z-index: 25; left: 50%; bottom: calc(16px + var(--safe-b));
+  transform: translateX(-50%); width: min(880px, calc(100vw - 32px - 2 * var(--safe-x)));
   display: grid; align-items: center; gap: 16px; padding: 10px 14px 10px 10px; border-radius: 18px;
   grid-template-columns: minmax(0, 1fr) minmax(280px, 1.4fr) minmax(0, 1fr);
   --glass-fill: rgba(30, 30, 30, .72); --glass-edge: rgba(255, 255, 255, .14); --glass-hi: rgba(255, 255, 255, .2);
@@ -223,7 +228,7 @@ input[type="range"]:focus-visible { outline: none; }
   .scroller { padding: 0 8px 50vh; }
   .paper { padding: 4px 6px; border-radius: 10px; }
   .bar {
-    width: calc(100vw - 16px); bottom: calc(8px + env(safe-area-inset-bottom));
+    width: calc(100vw - 16px - 2 * var(--safe-x)); bottom: calc(8px + var(--safe-b));
     grid-template: "seek seek seek seek seek" auto "speed names mid source video" auto / auto auto 1fr auto auto;
     gap: 0; padding: 6px 6px 8px;
   }
@@ -235,7 +240,7 @@ input[type="range"]:focus-visible { outline: none; }
   #namesBtn { grid-area: names; }
   #sourceBtn { grid-area: source; }
   #videoBtn { grid-area: video; }
-  .now { width: 140px; right: 8px; bottom: calc(var(--bar-h) + 20px); }
+  .now { width: 140px; right: calc(8px + var(--safe-r)); bottom: calc(var(--bar-h) + 20px + var(--safe-b)); }
 }
 
 @media (prefers-reduced-motion: reduce) {

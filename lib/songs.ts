@@ -6,9 +6,13 @@ export type Song = {
   audio: string;  // the recording in output/, full file name
   video?: string; // the original video in input/, if there is one
   source?: string;
+  // Easy versions: left-hand levels, easiest first, each its own sheet (<name>.<level>.musicxml
+  // and .timing.json, written by to_sheet.py --easy), and the one a link opens with.
+  levels?: string[];
+  level?: string;
 };
 
-export const SONGS: Song[] = list;
+export const SONGS: Song[] = list as Song[];
 export const SITE = "https://phucbm.github.io/piano-sheet";
 
 // The recording's name without the extension: the song the versions belong to.
