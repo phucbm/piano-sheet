@@ -1,11 +1,12 @@
 [project]
 name = "piano-sheet"
 version = "0.1.0"
-description = "Add your description here"
+description = "Turn a piano video or recording into a two-hand sheet and practise it in the browser"
 authors = [
     { name = "phucbm", email = "hiphucbui@gmail.com" }
 ]
 requires-python = ">=3.11"
+license = "MIT"
 dependencies = [
     "librosa>=0.11.0",
     "music21>=10.5.1",
