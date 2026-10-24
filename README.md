@@ -2,7 +2,7 @@
 
 Turn a piano video/recording into a two-hand sheet and practise it in the browser.
 
-**Live demo: https://phucbm.github.io/piano-sheet/** ([easy version in C](https://phucbm.github.io/piano-sheet/?song=vien-da-nho-easy-in-C))
+**Live demo: https://phucbm.github.io/piano-sheet/** ([easy version in C](https://phucbm.github.io/piano-sheet/song/vien-da-nho-easy-in-C/))
 
 The player renders the sheet, plays it back at 50–100% speed, highlights the notes as they
 sound and follows the current line, and plays the original video in step with the sheet
@@ -13,7 +13,7 @@ them. It works on phone, tablet and desktop.
 ## Requirements
 
 - [uv](https://docs.astral.sh/uv/) (Python 3.11+) and [ffmpeg](https://ffmpeg.org/)
-- [pnpm](https://pnpm.io/) for the local player (optional — any static file server works)
+- Node 22 and [pnpm](https://pnpm.io/) for the player
 
 ## Use
 
@@ -22,7 +22,7 @@ uv sync
 mkdir -p models && curl -L -o models/piano_crnn.pth "https://zenodo.org/record/4034264/files/CRNN_note_F1%3D0.9677_pedal_F1%3D0.9186.pth?download=1"
 scripts/run.sh input/song.mp4               # -> output/song.musicxml + .mid
 scripts/run.sh input/song.mp4 --transpose -6 --easy  # easy version (set N so it lands in C)
-pnpm install && pnpm dev                     # serves + opens http://localhost:8000
+pnpm install && pnpm dev                     # player on http://localhost:8000
 uv run python scripts/check_highlight.py output/song.musicxml  # player highlights every note
 ```
 
@@ -32,9 +32,11 @@ uv run python scripts/check_highlight.py output/song.musicxml  # player highligh
 
 To add a song to the player, put `output/<name>.musicxml` and `output/<name>.timing.json`
 (both written by `to_sheet.py`) and the recording `output/<audio>.wav` in place, and add it to
-`SONGS` at the top of `player.js`, with `video: "input/<file>"` if there is a video. The
-timing file gives the recording time of every sixteenth on the sheet, so the video stays in step
-even though the sheet plays at one fixed tempo.
+`songs.json`: `{ "name": "<name>", "audio": "<audio>.wav", "video": "<file in input/>", "source": "" }`
+(leave out `video` if there is none). Then `scripts/thumb.sh <name>` makes the picture shown when
+the song's link is shared. The timing file gives the recording time of every sixteenth on the
+sheet, so the video stays in step even though the sheet plays at one fixed tempo. Every song gets
+its own page, `/song/<name>/`; `pnpm dev` and `pnpm build` copy the files it uses into `public/media/`.
 
 ## How
 
@@ -42,15 +44,17 @@ even though the sheet plays at one fixed tempo.
 2. ByteDance piano transcription (high-resolution onset/offset model) writes MIDI.
 3. `to_sheet.py` tracks the beat with librosa, snaps notes to 16ths, splits hands at middle C,
    spells notes for the key, writes MusicXML.
-4. `index.html` + `player.js` render it with Verovio and play it with html-midi-player,
-   highlighting notes, with the original video kept in step through `<name>.timing.json`.
+4. The player (Next.js, exported as a static site; `lib/player/engine.ts`) renders it with
+   Verovio and plays it with html-midi-player, highlighting notes, with the original video kept
+   in step through `<name>.timing.json`.
 
 Open `output/*.musicxml` in MuseScore (free) to fix notes by hand.
 
 ## Deploy
 
-The player is static (`index.html`, `player.css`, `player.js`, no build step), served from the `main` branch root by GitHub Pages.
-Every push to `main` redeploys https://phucbm.github.io/piano-sheet/.
+`.github/workflows/pages.yml` builds the player (`pnpm build`, a static export in `out/`) and
+deploys it to GitHub Pages on every push to `main`; https://phucbm.github.io/piano-sheet/ updates
+1–2 minutes later. Old links with `?song=<name>` still open the song.
 
 ## Contributing
 

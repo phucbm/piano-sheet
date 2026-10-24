@@ -1,6 +1,6 @@
 # 004: Move the player to Next.js, exported as a static site for GitHub Pages
 
-Written: 2026-10-24. Status: Draft
+Written: 2026-10-24. Status: Done on branch `nextjs` (deploy switch pending)
 Related: plan 002 (the player), plan 003 (songs from a link, `songs.json`, the merge flow)
 
 ## Goal

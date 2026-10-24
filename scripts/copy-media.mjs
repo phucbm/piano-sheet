@@ -1,0 +1,23 @@
+// Copies what the songs in songs.json use from output/ and input/ into public/media/
+// (run before `next dev` and `next build`). Only those files, so the Pages artifact stays small.
+import { copyFileSync, existsSync, mkdirSync, readFileSync, rmSync } from "node:fs";
+
+const songs = JSON.parse(readFileSync("songs.json", "utf8"));
+const dest = "public/media";
+const files = new Set(), missing = [];
+const need = (path, optional) => existsSync(path) ? files.add(path) : optional || missing.push(path);
+
+for (const s of songs) {
+  need(`output/${s.name}.musicxml`);
+  need(`output/${s.name}.timing.json`);
+  need(s.video ? `input/${s.video}` : `output/${s.audio}`);  // the recording alone when there's no video
+  need(`output/${s.audio.replace(/\.[^.]+$/, "")}.jpg`, true);  // preview picture (scripts/thumb.sh)
+}
+if (missing.length) {
+  console.error(`copy-media: files listed in songs.json are missing:\n  ${missing.join("\n  ")}`);
+  process.exit(1);
+}
+rmSync(dest, { recursive: true, force: true });
+mkdirSync(dest, { recursive: true });
+for (const f of files) copyFileSync(f, `${dest}/${f.split("/").pop()}`);
+console.log(`copy-media: ${files.size} files → ${dest}/`);

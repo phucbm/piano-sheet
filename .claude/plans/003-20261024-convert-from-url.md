@@ -31,7 +31,8 @@ later), auth, accounts, queue/limits beyond what GitHub gives.
   `vm.tiktok.com` over https, strip query tracking (`?si=`), pass it to scripts as an argument.
 - **Save everything** (owner's call): the PR commits the sheets, the MIDI and the audio. Audio as
   `.m4a` (AAC ~96 kbps), not `.wav`, to keep the repo small.
-- The site stays static on GitHub Pages from `main`, no build step. `pnpm dev` still works.
+- The site stays static on GitHub Pages, built by `.github/workflows/pages.yml` (Next.js static
+  export, plan 004) on every push to `main`. `pnpm dev` still works.
 - Every new sheet passes `scripts/check_highlight.py` before the PR is opened.
 
 ## Discord messages
@@ -41,7 +42,7 @@ later), auth, accounts, queue/limits beyond what GitHub gives.
 | Issue with `new-song` label opened | `convert.yml` | 🎵 New song request #N: <link> (by @user) |
 | PR opened | `convert.yml` | 🎼 Sheets ready for #N → PR #M (key, BPM, note counts) |
 | Any step failed | `convert.yml` | ❌ #N failed at <step> → run link |
-| `song/*` PR merged | `song-merged.yml` | ✅ Added <name> → live link `?song=<name>` |
+| `song/*` PR merged | `song-merged.yml` | ✅ Added <name> → live link `/song/<name>/` |
 
 Post with `curl -H 'Content-Type: application/json' -d @payload.json "$DISCORD_WEBHOOK"`
 (payload built with `jq` so the link and names are escaped).
@@ -75,15 +76,16 @@ building anything.
 - Save `output/<name>.m4a` (player audio), the `.musicxml` and `.mid` files; keep `.raw.mid`
   as today; don't commit the `.wav` (add `output/*.wav` for new songs to `.gitignore`, keep the
   existing `vien-da-nho.wav` until the player reads `.m4a`).
-- Append both versions to `songs.json`.
+- Append both versions to `songs.json` (with `video` when there is one) and run
+  `scripts/thumb.sh <name>` for the link preview picture.
 - Print a summary (key, BPM, note counts) the workflow puts in the PR body.
 
 ### 3. Song list in `songs.json`
 
-- Move `SONGS` from `index.html` to `songs.json`:
-  `[{ "name": "vien-da-nho", "audio": "vien-da-nho.wav", "source": "" }, …]`, with `audio`
-  the full file name and `source` the original link (shown in the player as "Original").
-- `index.html` fetches it on load. `?song=` keeps working.
+- Done in plan 004: `songs.json` at the root,
+  `[{ "name": "vien-da-nho", "audio": "vien-da-nho.wav", "video": "vien-da-nho.MP4", "source": "" }, …]`,
+  with `audio` the full file name in `output/`, `video` the file in `input/` and `source` the
+  original link (shown in the player as "Original"). Read at build time; every song gets a page.
 - Two song PRs both add lines at the end of the array → `add.sh` keeps the array sorted by name
   so conflicts are rare; if one happens, the second PR is rebased by re-running the workflow.
 
@@ -103,7 +105,8 @@ building anything.
 - `concurrency: song-${{ github.event.issue.number }}`.
 - Steps: Discord "new request" → parse + validate link and name (env vars, see Rules) → set up
   uv + Python 3.11, ffmpeg, latest yt-dlp → cache `models/piano_crnn.pth` (`actions/cache`, key
-  on the file URL; download from zenodo on miss) and the uv cache → `scripts/add.sh` → commit to
+  on the file URL; download from zenodo on miss) and the uv cache → `scripts/add.sh` → `pnpm install && pnpm build`
+  (a song that breaks the build fails here, before review) → commit to
   branch `song/<name>` → `gh pr create` with the summary, the link and `Closes #N` → comment the
   PR link on the issue → Discord "sheets ready".
 - If the branch or the song name already exists: comment on the issue and stop (no overwrite).
@@ -113,12 +116,12 @@ building anything.
 ### 6. Workflow `.github/workflows/song-merged.yml`
 
 - `on: pull_request: types: [closed]`, `if: merged && startsWith(head.ref, 'song/')`.
-- Discord "added" with `https://phucbm.github.io/piano-sheet/?song=<name>`. The issue closes
+- Discord "added" with `https://phucbm.github.io/piano-sheet/song/<name>/`. The issue closes
   through `Closes #N`.
 
 ### 7. Submit box on the site
 
-- `index.html`: a glass input + "Make sheets" button (plan 002's glass style). Checks the link is
+- `components/SubmitBox.tsx` (rendered by the player): a glass input + "Make sheets" button (plan 002's glass style). Checks the link is
   YouTube/TikTok, then opens
   `https://github.com/phucbm/piano-sheet/issues/new?template=new-song.yml&title=New+song:+<host>&link=<url>`
   (issue-form fields prefill from query params by their `id`).

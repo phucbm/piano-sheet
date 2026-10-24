@@ -2,9 +2,20 @@
   "name": "piano-sheet",
   "private": true,
   "scripts": {
-    "dev": "vite --port 8000 --open"
+    "predev": "node scripts/copy-media.mjs",
+    "dev": "next dev -p 8000",
+    "prebuild": "node scripts/copy-media.mjs",
+    "build": "next build"
   },
   "devDependencies": {
-    "vite": "^8.3.5"
-  }
+    "@types/node": "^26.6.5",
+    "@types/react": "^19.3.0",
+    "typescript": "^5.9.3"
+  },
+  "dependencies": {
+    "next": "^16.4.3",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1"
+  },
+  "packageManager": "pnpm@10.22.0"
 }

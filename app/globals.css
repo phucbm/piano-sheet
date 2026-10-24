@@ -17,7 +17,7 @@
 html, body { height: 100%; }
 body {
   margin: 0; background: var(--bg); color: var(--fg); overflow: hidden;
-  font: 14px/1.4 Manrope, system-ui, sans-serif; -webkit-font-smoothing: antialiased;
+  font: 14px/1.4 var(--font-manrope), Manrope, system-ui, sans-serif; -webkit-font-smoothing: antialiased;
 }
 button { font: inherit; color: inherit; cursor: pointer; border: 0; background: none; padding: 0; }
 svg { width: 20px; height: 20px; fill: currentColor; flex: none; }
