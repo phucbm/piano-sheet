@@ -58,7 +58,7 @@ const Markup = memo(function Markup() {
       <div className="now glass" id="now" hidden>
         <div className="video-wrap">
           <video id="video" playsInline webkit-playsinline="" preload="auto" muted></video>
-          <div className="no-video"><svg><use href="#i-note"/></svg></div>
+          <div className="video-placeholder"><svg><use href="#i-note"/></svg></div>
         </div>
         <button className="now-close" id="nowClose" aria-label="Close video"><svg><use href="#i-close"/></svg></button>
       </div>

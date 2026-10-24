@@ -2,5 +2,6 @@
   { "name": "vien-da-nho", "audio": "vien-da-nho.wav", "video": "vien-da-nho.MP4", "source": "" },
   { "name": "vien-da-nho-easy-in-C", "audio": "vien-da-nho.wav", "video": "vien-da-nho.MP4", "source": "",
     "levels": ["root", "fifth", "broken", "ballad"], "level": "fifth" },
-  { "name": "DoiBo-QuiSaura", "source": "" }
+  { "name": "DoiBo-QuiSaura", "source": "" },
+  { "name": "Canon_in_D", "source": "" }
 ]
