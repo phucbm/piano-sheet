@@ -98,8 +98,34 @@ text.note-name.playing { fill: var(--accent); font-weight: bold; }
 /* A row or bar loop: the bars outside it fade back. */
 #score g.measure { transition: opacity .25s; }
 body[data-loop="row"] #score g.measure:not(.in-loop), body[data-loop="bar"] #score g.measure:not(.in-loop) { opacity: .3; }
+#score { position: relative; }
+#score rect.bar-hit { fill: transparent; }
+body[data-loop="bar"] #score g.measure { cursor: pointer; }
+body[data-loop="bar"] #score g.measure.in-loop > rect.bar-hit { fill: rgba(232, 68, 46, .1); }
+body[data-loop="bar"] #score g.measure.bar-hover:not(.in-loop) { opacity: .75; }
+body[data-loop="bar"] #score g.measure.bar-hover:not(.in-loop) > rect.bar-hit { fill: rgba(232, 68, 46, .06); }
+.bar-tag {
+  position: absolute; z-index: 1; transform: translateY(-100%); padding: 1px 7px; border-radius: 6px 6px 6px 0;
+  background: var(--accent); color: #fff; font-size: 11px; font-weight: 800; white-space: nowrap; pointer-events: none;
+}
 /* One hand on: the other hand's staff and names fade back. */
 body[data-hand="right"] #score .left, body[data-hand="left"] #score .right { opacity: .3; }
+/* The loop's count-in: the beat number and a dot per beat, above the bar. */
+.count {
+  position: absolute; z-index: 5; left: 50%; bottom: calc(var(--bar-h) + 28px + var(--safe-b)); transform: translateX(-50%);
+  display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 150px; padding: 10px 22px 14px;
+  border-radius: 20px; background: rgba(24, 24, 24, .92); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .1), 0 16px 40px rgba(0, 0, 0, .45);
+  pointer-events: none;
+}
+.count small { color: var(--muted); font-size: 12px; font-weight: 700; }
+.count b { font-size: 56px; line-height: 1; font-weight: 800; font-variant-numeric: tabular-nums; min-height: 56px; }
+.count b.down { color: var(--accent); }
+.count b.beat { animation: beat .25s ease-out; }
+@keyframes beat { from { transform: scale(1.3); } }
+#countDots { display: flex; gap: 8px; margin-top: 6px; }
+#countDots i { width: 9px; height: 9px; border-radius: 50%; background: rgba(255, 255, 255, .2); transition: background-color .1s; }
+#countDots i.on { background: #fff; }
+#countDots i.on:first-child { background: var(--accent); }
 .back-pill { position: absolute; left: 50%; bottom: calc(var(--bar-h) + 28px + var(--safe-b)); transform: translateX(-50%); box-shadow: inset 0 0 0 1px var(--glass-edge), inset 0 1.5px 0 var(--glass-hi), 0 6px 20px rgba(0, 0, 0, .25); }
 
 

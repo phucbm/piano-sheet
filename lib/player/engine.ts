@@ -39,11 +39,20 @@ export function createEngine(root: HTMLElement, SONGS: Song[], navigate: (href: 
     offs.push(() => ro.disconnect());
   }
 
+  // Every control's choice is kept in localStorage, so a reload comes back the same. The page's
+  // own ?names=, ?hand=, ?level= and ?sound= (a shared link) win over what's kept.
+  const STORE = "piano-sheet:settings";
+  type Saved = { speed: number; names: string; hand: string; level: string; sound: string; source: string; loop: string; volume: number; muted: boolean; video: boolean; song: string; bars: Record<string, [number, number]> };
+  const saved: Partial<Saved> = (() => { try { return JSON.parse(localStorage.getItem(STORE) || "{}"); } catch { return {}; } })();
+  const bars = saved.bars || {};  // song name -> the bar loop's bars
+
   // Positions ("pos") are seconds of the sheet at 100% speed. The sheet's MIDI, rendered at
   // the chosen speed, runs pos / speed; the recording runs toRec(pos).
   const state = {
     song: null as Song | null, xml: "", timing: null as Timing | null, duration: 0,
-    speed: 1, names: params.get("names") || "", hand: params.get("hand") || "", level: params.get("level") || "", sound: params.get("sound") || "natural", source: "sheet", loop: "", volume: 0.8, muted: false,
+    speed: saved.speed || 1, names: params.get("names") ?? saved.names ?? "", hand: params.get("hand") ?? saved.hand ?? "",
+    level: params.get("level") ?? saved.level ?? "", sound: params.get("sound") ?? saved.sound ?? "natural",
+    source: saved.source || "sheet", loop: saved.loop || "", volume: saved.volume ?? 0.8, muted: !!saved.muted,
     playing: false, pos: 0, follow: true,
   };
   let tk: any, lastIds: string[] = [], measures: { pos: number; id: string }[] = [], currentSystem: Element | null = null, raf = 0;
@@ -52,6 +61,12 @@ export function createEngine(root: HTMLElement, SONGS: Song[], navigate: (href: 
   let handOf = new Map<string, string>();  // note id -> "right" (top staff) or "left" (bottom staff)
   let pedalUps: number[] = [];  // MIDI seconds where the sustain pedal changes
   let barTimes: { at: number; len: number }[] = [];  // MIDI seconds of each bar
+
+  function save() {
+    const { speed, names, hand, level, sound, source, loop, volume, muted } = state;
+    const data: Saved = { speed, names, hand, level, sound, source, loop, volume, muted, video: !$("now").hidden, song: state.song?.name || saved.song || "", bars };
+    try { localStorage.setItem(STORE, JSON.stringify(data)); } catch {}
+  }
 
   const clamp = (v: number, lo: number, hi: number) => Math.min(Math.max(v, lo), hi);
   const fmt = (s: number) => { s = Math.max(0, Math.round(s)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`; };
@@ -88,6 +103,7 @@ export function createEngine(root: HTMLElement, SONGS: Song[], navigate: (href: 
     pedalUps = pedalChanges(map);
     measures = map.filter((e: any) => e.measureOn).map((e: any) => ({ pos: e.tstamp * state.speed / 1000, id: e.measureOn }));
     state.duration = (map.at(-1)?.tstamp || 0) * state.speed / 1000;
+    addBarHits();
     setLoopRange(state.pos);
     renderedWidth = width;
     lastIds = []; currentSystem = null;
@@ -537,8 +553,9 @@ export function createEngine(root: HTMLElement, SONGS: Song[], navigate: (href: 
   }
   // A bar is the song's usual bar length (the median, so a short pickup bar doesn't count) at
   // the chosen speed, split into the time signature's beats. Clicks go through Tone's audio
-  // context, which the sheet's sound has already started. Returns the count-in's length in ms.
-  let clicks: OscillatorNode[] = [];
+  // context, which the sheet's sound has already started; the count card above the bar shows
+  // each beat at the same moments, sound or not. Returns the count-in's length in ms.
+  let clicks: OscillatorNode[] = [], beatTimers: ReturnType<typeof setTimeout>[] = [];
   function countIn() {
     const bars = measures.slice(1).map((m, i) => m.pos - measures[i].pos).sort((x, y) => x - y);
     const bar = (bars[bars.length >> 1] || 2) / state.speed;
@@ -559,37 +576,141 @@ export function createEngine(root: HTMLElement, SONGS: Song[], navigate: (href: 
         clicks.push(osc);
       }
     } catch {}
+    const dots = $("countDots");
+    dots.innerHTML = "<i></i>".repeat(beats);
+    $("countNum").textContent = "";
+    $("count").hidden = false;
+    for (let k = 0; k < beats; k++) beatTimers.push(setTimeout(() => {
+      const num = $("countNum");
+      num.textContent = String(k + 1);
+      num.classList.toggle("down", k === 0);
+      num.classList.remove("beat");
+      void num.offsetWidth;  // restart the pop
+      num.classList.add("beat");
+      dots.children[k]?.classList.add("on");
+    }, 50 + k * bar / beats * 1000));
+    beatTimers.push(setTimeout(() => $("count").hidden = true, bar * 1000 + 50));
     return bar * 1000 + 50;
   }
   function stopClicks() {
     clicks.forEach(c => { try { c.stop(); } catch {} });
     clicks = [];
+    beatTimers.forEach(clearTimeout);
+    beatTimers = [];
+    $("count").hidden = true;
   }
   function setLoopRange(pos: number) {
     scoreEl.querySelectorAll(".in-loop").forEach(m => m.classList.remove("in-loop"));
     loopRange = null;
-    if (!state.loop || !measures.length) return;
-    if (state.loop === "all") { loopRange = [0, state.duration]; return; }
+    if (!state.loop || !measures.length) return tagBars();
+    if (state.loop === "all") { loopRange = [0, state.duration]; return tagBars(); }
     let a = barAt(pos), b = a + 1;
     if (state.loop === "row") {
       const system = systemOf(a);
       while (a > 0 && systemOf(a - 1) === system) a--;
       while (b < measures.length && systemOf(b) === system) b++;
+    } else if (!loopBars) {  // still picking: only the start bar, if tapped yet
+      if (pickStart !== null) markBars(pickStart, pickStart + 1);
+      return tagBars();
+    } else {  // the bars chosen: kept, or moved to pos keeping their length
+      if (a >= loopBars[0] && a < loopBars[1]) [a, b] = loopBars;
+      else b = Math.min(a + loopBars[1] - loopBars[0], measures.length);
+      loopBars = [a, b];
+      if (state.song) { bars[state.song.name] = loopBars; save(); }
     }
-    for (let i = a; i < b; i++) document.getElementById(measures[i].id)?.classList.add("in-loop");
+    markBars(a, b);
     loopRange = [measures[a].pos, measures[b]?.pos ?? state.duration];
+    tagBars();
   }
+  const markBars = (a: number, b: number) => {
+    for (let i = a; i < b; i++) document.getElementById(measures[i].id)?.classList.add("in-loop");
+  };
   function setLoop(loop: string) {
     state.loop = loop;
     body.dataset.loop = loop;
+    loopBars = null;
+    pickStart = null;
+    if (state.song) delete bars[state.song.name];
     setLoopRange(now());
   }
 
-  // Tap a note (or its name) to jump there.
+  // Bar loop: every bar dims; tap the first bar (it lights up, tagged Start), then the last
+  // (tagged End) and the loop is set and plays from its start. A tap after that picks again.
+  let loopBars: [number, number] | null = null;  // first bar, the bar after the last
+  let pickStart: number | null = null;
+  function tapBar(i: number) {
+    if (pickStart === null) {
+      loopBars = null;
+      pickStart = i;
+      setLoopRange(now());
+      return toast("Now tap the last bar");
+    }
+    loopBars = [Math.min(pickStart, i), Math.max(pickStart, i) + 1];
+    pickStart = null;
+    const pos = now();
+    setLoopRange(measures[loopBars[0]].pos);
+    if (pos < loopRange![0] || pos >= loopRange![1]) seek(loopRange![0]);
+    const [first, last] = [loopBars[0] + 1, loopBars[1]];
+    toast(first === last ? `Loop bar ${first}` : `Loop bars ${first}–${last}`);
+  }
+
+  // A see-through box over each bar, so a tap anywhere in it counts (and it lights the loop).
+  function addBarHits() {
+    scoreEl.querySelectorAll<SVGGElement>("g.measure").forEach(m => {
+      const box = m.getBBox(), hit = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+      hit.setAttribute("class", "bar-hit");
+      Object.entries({ x: box.x, y: box.y, width: box.width, height: box.height }).forEach(([k, v]) => hit.setAttribute(k, String(v)));
+      m.prepend(hit);
+    });
+  }
+
+  // The Start and End tags over the bar loop's first and last bars.
+  function tagBars() {
+    scoreEl.querySelectorAll(".bar-tag").forEach(t => t.remove());
+    if (state.loop !== "bar") return;
+    const [first, last] = loopBars ? [loopBars[0], loopBars[1] - 1] : [pickStart, pickStart];
+    if (first === null) return;
+    const tag = (i: number, text: string) => {
+      const m = measures[i] && document.getElementById(measures[i].id);
+      if (!m) return;
+      const r = m.getBoundingClientRect(), sr = scoreEl.getBoundingClientRect();
+      const el = document.createElement("span");
+      el.className = "bar-tag";
+      el.textContent = text;
+      Object.assign(el.style, { left: r.left - sr.left + "px", top: r.top - sr.top + "px" });
+      scoreEl.appendChild(el);
+    };
+    if (first === last) tag(first, loopBars ? "Start · End" : "Start");
+    else { tag(first, "Start"); tag(last!, "End"); }
+  }
+
+  // Picking with a mouse: the bar under it lights up, or once Start is tapped, Start to it.
+  let hovered = -1;
+  function hoverBars(i: number) {
+    if (i === hovered) return;
+    hovered = i;
+    scoreEl.querySelectorAll(".bar-hover").forEach(m => m.classList.remove("bar-hover"));
+    if (i < 0) return;
+    const from = pickStart ?? i;
+    for (let k = Math.min(from, i); k <= Math.max(from, i); k++) document.getElementById(measures[k].id)?.classList.add("bar-hover");
+  }
+  on(scoreEl, "pointermove", e => {
+    if (e.pointerType !== "mouse" || state.loop !== "bar") return hoverBars(-1);
+    const measure = e.target.closest("g.measure");
+    hoverBars(measure ? measures.findIndex(m => m.id === measure.id) : -1);
+  });
+  on(scoreEl, "pointerleave", () => hoverBars(-1));
+
+  // Tap a note (or its name) to jump there; with the bar loop on, tap a bar to choose it.
   on(scoreEl, "click", e => {
     const el = e.target.closest("g.note, [data-note]");
     const id = el?.dataset.note || el?.id;
-    if (id) seek(tk.getTimeForElement(id) * state.speed / 1000);
+    const pos = id && tk.getTimeForElement(id) * state.speed / 1000;
+    if (state.loop === "bar" && measures.length) {
+      const measure = e.target.closest("g.measure");
+      const i = id ? barAt(pos) : measures.findIndex(m => m.id === measure?.id);
+      if (i >= 0) { tapBar(i); hovered = -1; hoverBars(i); }
+    } else if (id) seek(pos);
   });
 
   // ---------- Sound ----------
@@ -642,8 +763,8 @@ export function createEngine(root: HTMLElement, SONGS: Song[], navigate: (href: 
     rerender();
   }
 
-  on(volumeEl, "input", () => { state.volume = +volumeEl.value; state.muted = false; applyVolume(); });
-  on($("mute"), "click", () => { state.muted = !state.muted; if (!state.volume) state.volume = 0.8; applyVolume(); });
+  on(volumeEl, "input", () => { state.volume = +volumeEl.value; state.muted = false; applyVolume(); save(); });
+  on($("mute"), "click", () => { state.muted = !state.muted; if (!state.volume) state.volume = 0.8; applyVolume(); save(); });
 
   // Easy songs: step through the left-hand levels, staying at the same place in the song.
   async function setLevel(level: string) {
@@ -749,7 +870,7 @@ export function createEngine(root: HTMLElement, SONGS: Song[], navigate: (href: 
     loop: {
       values: ["", "all", "row", "bar"], get: () => state.loop, set: setLoop,
       label: v => `<svg><use href="#i-loop"/></svg>` + (v === "row" || v === "bar" ? `<span class="tog-badge">${v}</span>` : ""),
-      name: v => "Loop " + ({ "": "off", all: "the whole song", row: "this row", bar: "this bar" } as any)[v], on: v => !!v,
+      name: v => "Loop " + ({ "": "off", all: "the whole song", row: "this row", bar: "bars: tap the bar to start from" } as any)[v], on: v => !!v,
     },
     source: {
       values: ["sheet", "original", "both"], get: () => state.source, set: setSource,
@@ -778,6 +899,7 @@ export function createEngine(root: HTMLElement, SONGS: Song[], navigate: (href: 
     const next = t.values[(t.values.indexOf(t.get()) + 1) % t.values.length];
     t.set(next);
     updateToggles();
+    save();
     toast(t.name(next));
   }));
 
@@ -798,6 +920,7 @@ export function createEngine(root: HTMLElement, SONGS: Song[], navigate: (href: 
   function setVideoOpen(open: boolean) {
     $("now").hidden = !open;
     $("videoBtn").setAttribute("aria-pressed", open);
+    save();
   }
   on($("videoBtn"), "click", () => { setVideoOpen($("now").hidden); toast($("now").hidden ? "Video off" : "Video on"); });
   on($("nowClose"), "click", () => setVideoOpen(false));
@@ -889,6 +1012,9 @@ export function createEngine(root: HTMLElement, SONGS: Song[], navigate: (href: 
     state.song = song;
     state.level = levelOf(song);
     if (!keepPos) state.pos = 0;
+    loopBars = bars[song.name] || null;
+    pickStart = null;
+    save();
     const level = state.level;
     $("levelBtn").hidden = !song.levels;
     updateToggles();
@@ -944,12 +1070,15 @@ export function createEngine(root: HTMLElement, SONGS: Song[], navigate: (href: 
   buildLibrary();
   updateToggles();
   applyVolume();
-  setVideoOpen(false);
+  body.dataset.loop = state.loop;
+  setVideoOpen(!!saved.video);
 
-  // The song the page asks for (/song/<name>/, or the old ?song=), else the first one.
+  // The song the page asks for (/song/<name>/, or the old ?song=), else the last one opened,
+  // else the first one.
   let wanted: Song | null = null;
   function show(name: string | null) {
-    wanted = SONGS.find(s => s.name === (name || new URLSearchParams(location.search).get("song"))) || SONGS[0];
+    const asked = name || new URLSearchParams(location.search).get("song");
+    wanted = SONGS.find(s => s.name === asked) || (!asked && SONGS.find(s => s.name === saved.song)) || SONGS[0];
     if (tk && wanted !== state.song) load(wanted);
   }
 
@@ -968,6 +1097,7 @@ export function createEngine(root: HTMLElement, SONGS: Song[], navigate: (href: 
       clearTimeout(resizeTimer);
       clearTimeout(toastTimer);
       clearTimeout(loopWait);
+      beatTimers.forEach(clearTimeout);
       cancelAnimationFrame(raf);
     },
   };

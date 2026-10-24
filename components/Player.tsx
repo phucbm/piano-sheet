@@ -51,6 +51,7 @@ const Markup = memo(function Markup() {
           <div className="paper" id="score"></div>
         </div>
         <button className="glass light pill back-pill" id="backToCurrent" hidden>Back to current</button>
+        <div className="count" id="count" hidden aria-live="polite"><small>Loop again</small><b id="countNum"></b><span id="countDots"></span></div>
       </main>
 
       <div className="now glass" id="now" hidden>
