@@ -9,3 +9,4 @@ node_modules/
 out/
 public/media/
 next-env.d.ts
+*.tsbuildinfo
