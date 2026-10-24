@@ -54,7 +54,7 @@ anything by hand: install what's needed and do it all.
      (`ff`, `sf`, `p p p`). The natural sound plays dynamics, so these change the sound;
    - not read at all: tempo mark, title, composer, rit., grace notes, often the real fermata;
    - "Piano" printed on every system (part name and abbreviation).
-5. **Clean it**: the first four misreads above are fixed on their own; the rest are options
+5. **Clean it**: the first three misreads above are fixed on their own; the rest are options
    (see the docstring):
    ```sh
    uv run python scripts/omr_clean.py /tmp/omr/<file>.mxl output/<name>.musicxml --name <name> \
