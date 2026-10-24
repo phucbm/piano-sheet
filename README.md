@@ -10,6 +10,7 @@ mkdir -p models && curl -L -o models/piano_crnn.pth "https://zenodo.org/record/4
 scripts/run.sh input/song.mp4               # -> output/song.musicxml + .mid
 scripts/run.sh input/song.mp4 --transpose -6 --easy  # easy version (set N so it lands in C)
 pnpm install && pnpm dev                     # serves + opens http://localhost:8000
+uv run python scripts/check_highlight.py output/song.musicxml  # player highlights every note
 ```
 
 `to_sheet.py` options: `--split 60` (pitch where the right hand starts), `--shift N`
