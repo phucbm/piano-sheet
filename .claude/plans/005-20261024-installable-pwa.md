@@ -142,9 +142,9 @@ say plainly that the UI wasn't tested in a browser.
 
 Same as above, except:
 
-- **Icon:** a placeholder (keys on `#121212`, one red key) drawn in `app/icon.svg`, which is
-  also the favicon. `public/icons/icon-192.png` and `icon-512.png` are made from it with
-  `magick -background none -density 300 app/icon.svg -resize 512x512 …`. The keys sit inside the
+- **Icon:** a staff with two beamed notes, the second one red with a glow like the note the
+  player is lighting, on a dark gradient. It's drawn in `app/icon.svg`, which is also the favicon. `public/icons/icon-192.png` and `icon-512.png` are made from it with
+  `magick -background none -density 300 app/icon.svg -resize 512x512 …`. Everything sits inside the
   centre 80%, so `icon-512.png` is also the maskable icon. The Apple icon is `app/apple-icon.png`
   (180), not `metadata.icons`: setting `icons` in metadata hid the file-based favicon and
   Next didn't put `/piano-sheet` in front of it.
