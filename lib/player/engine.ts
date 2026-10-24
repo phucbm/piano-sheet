@@ -43,13 +43,15 @@ export function createEngine(root: HTMLElement, SONGS: Song[], navigate: (href: 
   // the chosen speed, runs pos / speed; the recording runs toRec(pos).
   const state = {
     song: null as Song | null, xml: "", timing: null as Timing | null, duration: 0,
-    speed: 1, names: params.get("names") || "", hand: params.get("hand") || "", level: params.get("level") || "", source: "sheet", loop: "", volume: 0.8, muted: false,
+    speed: 1, names: params.get("names") || "", hand: params.get("hand") || "", level: params.get("level") || "", sound: params.get("sound") || "natural", source: "sheet", loop: "", volume: 0.8, muted: false,
     playing: false, pos: 0, follow: true,
   };
   let tk: any, lastIds: string[] = [], measures: { pos: number; id: string }[] = [], currentSystem: Element | null = null, raf = 0;
   let anchor = { pos: 0, at: 0 };  // while the sheet plays: pos at a moment (performance.now())
   let midiReady: Promise<unknown> = Promise.resolve();
   let handOf = new Map<string, string>();  // note id -> "right" (top staff) or "left" (bottom staff)
+  let pedalUps: number[] = [];  // MIDI seconds where the sustain pedal changes
+  let barTimes: { at: number; len: number }[] = [];  // MIDI seconds of each bar
 
   const clamp = (v: number, lo: number, hi: number) => Math.min(Math.max(v, lo), hi);
   const fmt = (s: number) => { s = Math.max(0, Math.round(s)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`; };
@@ -79,10 +81,11 @@ export function createEngine(root: HTMLElement, SONGS: Song[], navigate: (href: 
     scoreEl.innerHTML = svg;
     markHands();
     const loaded = () => new Promise(r => player.addEventListener("load", r, { once: true }));
-    midiReady = loaded().then(() => state.hand && muteOtherHand(loaded()));
+    midiReady = loaded().then(() => reshapeMidi(loaded()));
     player.src = "data:audio/midi;base64," + tk.renderToMIDI();
     if (state.names) addNoteNames(state.names);  // needs the MIDI for the pitches
     const map = tk.renderToTimemap({ includeMeasures: true });
+    pedalUps = pedalChanges(map);
     measures = map.filter((e: any) => e.measureOn).map((e: any) => ({ pos: e.tstamp * state.speed / 1000, id: e.measureOn }));
     state.duration = (map.at(-1)?.tstamp || 0) * state.speed / 1000;
     setLoopRange(state.pos);
@@ -125,19 +128,101 @@ export function createEngine(root: HTMLElement, SONGS: Song[], navigate: (href: 
     updateToggles();
   }
 
-  // One hand only: drop the other hand's notes from the loaded MIDI, matched by pitch and
-  // onset (Verovio's ms are rounded, hence the margin). Resolves once the player reloads.
-  function muteOtherHand(reloaded: Promise<unknown>) {
-    const muted = new Map<number, number[]>();  // pitch -> onsets in ms
-    handOf.forEach((hand, id) => {
-      if (hand === state.hand) return;
-      const { time, pitch } = tk.getMIDIValuesForElement(id);
-      (muted.get(pitch) || muted.set(pitch, []).get(pitch)!).push(time);
+  // Where a pianist would change the pedal: every bar line and every chord name (its beat
+  // in the bar, 4/4). Times are the MIDI's seconds, at the rendered speed.
+  function pedalChanges(map: any[]) {
+    const bars = map.filter(e => e.measureOn).map(e => ({ at: e.tstamp / 1000, id: e.measureOn }));
+    const end = (map.at(-1)?.tstamp || 0) / 1000;
+    const ups: number[] = [];
+    barTimes = bars.map((bar, i) => ({ at: bar.at, len: (bars[i + 1]?.at ?? end) - bar.at }));
+    bars.forEach((bar, i) => {
+      const len = barTimes[i].len;
+      ups.push(bar.at);
+      scoreEl.querySelectorAll(`#${bar.id} g.harm`).forEach(h => {
+        const beat = +tk.getElementAttr(h.id).tstamp || 1;
+        if (beat > 1) ups.push(bar.at + (beat - 1) / 4 * len);
+      });
     });
+    return [...ups, end + 2].sort((a, b) => a - b);
+  }
+
+  // The sheet writes each note only until the hand's next one and leaves the rest to the
+  // pedal, which the synth doesn't play: so in the natural sound, hold every note until the
+  // pedal changes or the same key is struck again. With one hand on, the other hand's
+  // notes go first. Notes are matched to their hand by pitch and onset (Verovio's ms are
+  // rounded, hence the margin), then played with a pianist's touch. Resolves once the
+  // player reloads.
+  function reshapeMidi(reloaded: Promise<unknown>) {
+    const hands = new Map<number, { time: number; hand: string }[]>();  // pitch -> onsets in ms
+    handOf.forEach((hand, id) => {
+      const { time, pitch } = tk.getMIDIValuesForElement(id);
+      (hands.get(pitch) || hands.set(pitch, []).get(pitch)!).push({ time, hand });
+    });
+    const handOfNote = (n: any) => hands.get(n.pitch)?.find(h => Math.abs(h.time - n.startTime * 1000) < 5)?.hand;
     const ns = player.noteSequence;
-    const notes = ns.notes.filter((n: any) => !muted.get(n.pitch)?.some(t => Math.abs(t - n.startTime * 1000) < 5));
+    const kept = ns.notes.filter((n: any) => !state.hand || (handOfNote(n) ?? state.hand) === state.hand);
+    const notes = kept.map((n: any) => {
+      let endTime = n.endTime;
+      if (state.sound === "natural") {
+        const up = pedalUps.find(t => t > n.startTime + 0.01) ?? n.endTime;
+        const again = kept.find((m: any) => m.pitch === n.pitch && m.startTime > n.startTime + 0.01 && m.startTime < up);
+        endTime = Math.max(n.endTime, again ? again.startTime : up);
+      }
+      return Object.assign(Object.create(Object.getPrototypeOf(n)), n, { endTime, hand: handOfNote(n) || "right" });
+    });
+    if (state.sound === "natural") touch(notes);
+    notes.forEach((n: any) => delete n.hand);
     player.noteSequence = Object.assign(Object.create(Object.getPrototypeOf(ns)), ns, { notes });
+    setRoom(state.sound === "natural");
     return reloaded;
+  }
+
+  // The MIDI plays every note at the same loudness, on the dot. A pianist brings out the
+  // melody (the right hand's top note) over the rest, keeps the left hand softer, leans on
+  // beats 1 and 3, lets the tune swell as it climbs, and sounds the melody a hair before
+  // the rest of its chord; and no two notes land quite on the dot.
+  function touch(notes: any[]) {
+    const jitter = (size: number) => (Math.random() * 2 - 1) * size;
+    const accent = (t: number) => {
+      const bar = barTimes.findLast(b => b.at <= t + 0.01);
+      if (!bar) return 0;
+      const beat = (t - bar.at) / bar.len * 4;
+      if (Math.abs(beat - Math.round(beat)) > 0.05) return -4;  // off the beat
+      return ({ 0: 8, 2: 4 } as Record<number, number>)[Math.round(beat)] ?? 0;
+    };
+    const onsets = new Map<string, any[]>();  // hand + onset -> notes struck together
+    notes.forEach(n => {
+      const key = n.hand + Math.round(n.startTime * 100);
+      (onsets.get(key) || onsets.set(key, []).get(key)!).push(n);
+    });
+    const tops = [...onsets.values()].filter(g => g[0].hand === "right").map(g => Math.max(...g.map(n => n.pitch)));
+    const middle = tops.reduce((a, b) => a + b, 0) / (tops.length || 1);
+    onsets.forEach(group => {
+      const top = Math.max(...group.map(n => n.pitch)), bottom = Math.min(...group.map(n => n.pitch));
+      const a = accent(group[0].startTime);
+      group.forEach(n => {
+        let velocity;
+        if (n.hand === "right" && n.pitch === top) velocity = 76 + a + Math.max(-8, Math.min(8, (n.pitch - middle) * 0.8));
+        else if (n.hand === "right") velocity = 58 + a / 2;
+        else velocity = (n.pitch === bottom ? 60 : 52) + a / 2;
+        // On one of the soundfont's loudness layers (7, 15 … 127): each layer the song uses is
+        // another set of samples to download.
+        n.velocity = Math.max(23, Math.min(111, Math.round((velocity + 1) / 8) * 8 - 1));
+        const late = n.hand === "right" && n.pitch !== top ? 0.012 : 0;
+        n.startTime = Math.max(0, n.startTime + late + jitter(0.004));
+        n.endTime = Math.max(n.endTime, n.startTime + 0.05);
+      });
+    });
+  }
+
+  // A little room around the piano in the natural sound, set up once per page: the synth
+  // plays into Tone's output.
+  function setRoom(on: boolean) {
+    const Tone = (window as any).Tone;
+    const out = Tone && (Tone.Destination || Tone.Master);
+    if (!out) return;
+    if (!out.__room) out.chain(out.__room = new Tone.Reverb({ decay: 2.2, preDelay: 0.02 }));
+    out.__room.wet.value = on ? 0.2 : 0;
   }
 
   // The notes to light: with one hand on, only that hand's.
@@ -545,6 +630,12 @@ export function createEngine(root: HTMLElement, SONGS: Song[], navigate: (href: 
     rerender();
   }
 
+  function setSound(sound: string) {
+    state.sound = sound;
+    updateUrl();
+    rerender();
+  }
+
   function setHand(hand: string) {
     state.hand = hand;
     updateUrl();
@@ -644,6 +735,11 @@ export function createEngine(root: HTMLElement, SONGS: Song[], navigate: (href: 
       label: v => ({ "": "LR", right: "R", left: "L" } as any)[v],
       name: v => ({ "": "Both hands", right: "Right hand only", left: "Left hand only" } as any)[v], on: v => !!v,
     },
+    sound: {
+      values: ["natural", "raw"], get: () => state.sound, set: setSound,
+      label: v => ({ natural: "Nat", raw: "Raw" } as any)[v],
+      name: v => ({ natural: "Natural: pedal, dynamics, room", raw: "Raw: every note exact" } as any)[v], on: v => v !== "natural",
+    },
     level: {
       get values() { return state.song?.levels || []; }, get: () => state.level, set: setLevel,
       label: v => `L${(state.song?.levels || []).indexOf(v) + 1}`,
@@ -739,7 +835,7 @@ export function createEngine(root: HTMLElement, SONGS: Song[], navigate: (href: 
   // The page for a song, keeping the note names, hand and (if not the default) level.
   function hrefOf(song: Song) {
     const level = levelOf(song) === song.level ? "" : levelOf(song);
-    const q = new URLSearchParams(Object.entries({ names: state.names, hand: state.hand, level }).filter(([, v]) => v));
+    const q = new URLSearchParams(Object.entries({ names: state.names, hand: state.hand, level, sound: state.sound === "natural" ? "" : state.sound }).filter(([, v]) => v));
     return `/song/${song.name}/` + (q.size ? "?" + q : "");
   }
 

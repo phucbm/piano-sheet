@@ -85,6 +85,7 @@ const Markup = memo(function Markup() {
           <button className="btn icon tog" id="speedBtn" data-tog="speed"></button>
           <button className="btn icon tog" id="namesBtn" data-tog="names"></button>
           <button className="btn icon tog" id="handBtn" data-tog="hand"></button>
+          <button className="btn icon tog" id="soundBtn" data-tog="sound"></button>
           <button className="btn icon tog" id="levelBtn" data-tog="level" hidden></button>
           <button className="btn icon tog" id="sourceBtn" data-tog="source"></button>
           <div className="volume">
