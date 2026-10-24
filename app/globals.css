@@ -229,15 +229,19 @@ input[type="range"]:focus-visible { outline: none; }
   .paper { padding: 4px 6px; border-radius: 10px; }
   .bar {
     width: calc(100vw - 16px - 2 * var(--safe-x)); bottom: calc(8px + var(--safe-b));
-    grid-template: "seek seek seek seek seek" auto "speed names mid source video" auto / auto auto 1fr auto auto;
+    grid-template: "seek seek seek seek seek seek seek" auto "speed names hand mid level source video" auto / auto auto auto 1fr auto auto auto;
     gap: 0; padding: 6px 6px 8px;
   }
   .np, .volume { display: none; }
   .transport, .side { display: contents; }
   .seek { grid-area: seek; padding: 0 8px; }
-  .buttons { grid-area: mid; justify-self: center; gap: 4px; }
+  .buttons { grid-area: mid; justify-self: center; gap: 2px; }
+  /* Seven toggles and the transport in one row on a 375px phone: narrower, still 44px tall. */
+  .side .icon { width: 36px; }
   #speedBtn { grid-area: speed; }
   #namesBtn { grid-area: names; }
+  #handBtn { grid-area: hand; }
+  #levelBtn { grid-area: level; }
   #sourceBtn { grid-area: source; }
   #videoBtn { grid-area: video; }
   .now { width: 140px; right: calc(8px + var(--safe-r)); bottom: calc(var(--bar-h) + 20px + var(--safe-b)); }
