@@ -44,6 +44,11 @@ the song's link is shared. The timing file gives the recording time of every six
 sheet, so the video stays in step even though the sheet plays at one fixed tempo. Every song gets
 its own page, `/song/<name>/`; `pnpm dev` and `pnpm build` copy the files it uses into `public/media/`.
 
+A song can also come from a printed sheet (SVG, PDF or image) with no recording: type its notes
+into `input/<name>.notes` (`scripts/svg_notes.py` reads exact pitches from a Sibelius SVG), run
+`uv run python scripts/notes_to_sheet.py input/<name>.notes` and add `{ "name": "<name>", "source": "" }`
+to `songs.json`. The player then plays the sheet's own sound. Steps: `.claude/skills/sheet-from-picture/`.
+
 ## How
 
 1. ffmpeg pulls the audio out.

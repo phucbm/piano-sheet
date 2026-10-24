@@ -9,7 +9,7 @@ read -r video audio < <(python3 -c '
 import json, sys
 s = next((s for s in json.load(open("songs.json")) if s["name"] == sys.argv[1]), None)
 if not s: sys.exit(f"{sys.argv[1]} is not in songs.json")
-print(s.get("video") or "-", s["audio"])' "$name")
+print(s.get("video") or "-", s.get("audio") or s["name"])' "$name")
 if [ "$video" = "-" ]; then echo "$name has no video, the site-wide public/og.png is used"; exit 0; fi
 at=$(python3 -c 'import json, sys; print(json.load(open(sys.argv[1]))["sixteenths"][0])' "output/$name.timing.json" 2>/dev/null || echo 0)
 out="output/${audio%.*}.jpg"

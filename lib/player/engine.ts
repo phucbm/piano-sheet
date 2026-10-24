@@ -1,7 +1,7 @@
 // The player: renders the sheet with Verovio, plays it with html-midi-player, lights the
 // notes as they sound, follows the current line and keeps the original video in step.
 // Ported from player.js line for line; the DOM is components/Player.tsx.
-import { type Song, baseOf, versionOf } from "@/lib/songs";
+import { type Song, baseOf, versionOf, hasRecording } from "@/lib/songs";
 import { type Timing, toRec as recOf, toSheet as sheetOf, slope as slopeOf } from "./timing";
 import { createKeys } from "./keys";
 
@@ -463,7 +463,9 @@ export function createEngine(root: HTMLElement, SONGS: Song[], navigate: (href: 
 
   // ---------- Playback ----------
 
-  const leader = () => state.source === "original" ? "video" : "sheet";
+  // A sheet without a recording plays its own sound, whatever the Sound control says for the others.
+  const source = () => state.song && !hasRecording(state.song) ? "sheet" : state.source;
+  const leader = () => source() === "original" ? "video" : "sheet";
   const hasMedia = () => !!video.currentSrc;
 
   function now() {
@@ -772,13 +774,13 @@ export function createEngine(root: HTMLElement, SONGS: Song[], navigate: (href: 
 
   function applyVolume() {
     const v = state.muted ? 0 : state.volume;
-    video.muted = state.source === "sheet" || v === 0;
+    video.muted = source() === "sheet" || v === 0;
     video.volume = v;
     const Tone = (window as any).Tone;
     const out = Tone && (Tone.Destination || Tone.Master);
     if (out) {
       // In Both, the sheet plays quietly under the recording.
-      const sheet = state.source === "original" ? 0 : state.source === "both" ? v * 0.35 : v;
+      const sheet = source() === "original" ? 0 : source() === "both" ? v * 0.35 : v;
       out.mute = sheet === 0;
       if (sheet) out.volume.value = Tone.gainToDb(sheet);
     }
@@ -1226,7 +1228,7 @@ export function createEngine(root: HTMLElement, SONGS: Song[], navigate: (href: 
     updateUrl();
     const [xml, timing] = await Promise.all([
       fetch(media(`${fileOf(song)}.musicxml`)).then(r => r.ok ? r.text() : null).catch(() => null),
-      fetch(media(`${fileOf(song)}.timing.json`)).then(r => r.ok ? r.json() : null).catch(() => null),
+      hasRecording(song) ? fetch(media(`${fileOf(song)}.timing.json`)).then(r => r.ok ? r.json() : null).catch(() => null) : null,
     ]);
     if (state.song !== song || state.level !== level || destroyed) return;
     if (!xml) {  // offline, and the song hasn't been opened before (see sw/sw.ts)
@@ -1241,10 +1243,13 @@ export function createEngine(root: HTMLElement, SONGS: Song[], navigate: (href: 
     state.timing = timing;
     showMeta(song);
     body.classList.toggle("no-video", !song.video);
+    body.classList.toggle("no-recording", !hasRecording(song));
     if (!sameMedia) {
-      video.src = media(song.video || song.audio);  // the recording alone when there's no video
+      if (hasRecording(song)) video.src = media(song.video || song.audio!);  // the recording alone when there's no video
+      else { video.removeAttribute("src"); video.load(); }
       setThumb(null);
     }
+    applyVolume();
     render();
     setFollow(true);
     if (hasMedia() && video.readyState) video.currentTime = Math.max(0, toRec(state.pos));

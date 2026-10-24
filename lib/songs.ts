@@ -3,7 +3,7 @@ import list from "@/songs.json";
 // One entry per sheet. Versions of a song (original, easy-in-C, …) share the recording.
 export type Song = {
   name: string;   // output/<name>.musicxml and .timing.json
-  audio: string;  // the recording in output/, full file name
+  audio?: string; // the recording in output/, full file name; none for a sheet typed in from a picture
   video?: string; // the original video in input/, if there is one
   source?: string;
   // Easy versions: left-hand levels, easiest first, each its own sheet (<name>.<level>.musicxml
@@ -15,6 +15,7 @@ export type Song = {
 export const SONGS: Song[] = list as Song[];
 export const SITE = "https://phucbm.github.io/piano-sheet";
 
-// The recording's name without the extension: the song the versions belong to.
-export const baseOf = (s: Song) => s.audio.replace(/\.[^.]+$/, "");
+// The recording's name without the extension (the name when there's none): the song the versions belong to.
+export const baseOf = (s: Song) => s.audio ? s.audio.replace(/\.[^.]+$/, "") : s.name;
+export const hasRecording = (s: Song) => !!(s.audio || s.video);
 export const versionOf = (s: Song) => s.name === baseOf(s) ? "original" : s.name.replace(baseOf(s) + "-", "");

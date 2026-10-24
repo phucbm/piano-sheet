@@ -1,0 +1,61 @@
+# Typed in from input/DoiBo-QuiSaura.svg (Sibelius, one A4 page): Đôi Bờ (Qui saura), nhạc Ý, lời Việt Lữ Liên.
+# Pitches from scripts/svg_notes.py, lengths/ties/triplets read off the picture. Bar 0 is the pickup.
+name: DoiBo-QuiSaura
+key: C
+time: 4/4
+tempo: 65
+pickup: 1/16
+repeat: 9
+lh-beams: 2/4 2/4
+
+# bar 0
+rh: E5/16
+lh: r/16
+# bar 1
+rh: E5/8 E5/16 E5/16~ E5/8. E5/16 D5/8 D5/16 E5/16~ E5/8 D5/8
+lh: C3/8 G3/8 C4/8 G3/8 B2/8 G3/8 B3/8 G3/8
+# bar 2
+rh: C5/8. C5/16~ C5/2~ C5/8. C6/16
+lh: A2/8 E3/8 A3/8 E3/8 G2/8 E3/8 G3/8 E3/8
+# bar 3
+rh: C6/8 C6/16 C6/16~ C6/8. C6/16 B5/4 B5/8t A5/8t G5/8t
+lh: F2/8 C3/8 F3/8 C3/8 G2/8 D3/8 G3/8 D3/8
+# bar 4
+rh: G5/8 F5/16 E5/16~ E5/2~ E5/8. C6/16
+lh: C3/8 G3/8 D4/8 E4/8 C3/8 G3/8 B-3/8 C3/8
+# bar 5
+rh: C6/8 C6/16 C6/16~ C6/8. C6/16 B5/8 B5/16 B5/16~ B5/8 A5/8
+lh: F2/8 C3/8 F3/8 C3/8 G2/8 D3/8 G3/8 D3/8
+# bar 6
+rh: G5/4 G5/8t G5/8t F5/8t E5/4~ E5/8. E5/16
+lh: C3/8 G3/8 C4/8 B2/8 A2/8 E3/8 B3/8 C4/8
+# bar 7
+rh: F5/8 F5/16 F5/16~ F5/8 E5/16 D5/16~ D5/4 C5/8t E5/8t D5/8t
+lh: D3+F3+A3+D4/2a D3+G3+B3+D4/2a
+# bar 8
+rh: C5/2. r/8. E5/16
+lh: C3/8 G3/8 D4/8 E4/8 G4/2
+# bar 9
+rh: E5/8 E5/16 E5/16~ E5/8. E5/16 D5/8 D5/16 E5/16~ E5/8 D5/8
+lh: C3/8 G3/8 C4/8 G3/8 B2/8 G3/8 B3/8 G3/8
+# bar 10
+rh: C5/8. C5/16~ C5/2~ C5/8. C6/16
+lh: A2/8 E3/8 A3/8 E3/8 G2/8 E3/8 G3/8 E3/8
+# bar 11
+rh: C6/4 C6/8t C6/8t C6/8t B5/4 B5/8t A5/8t G5/8t
+lh: F2/8 C3/8 F3/8 C3/8 G2/8 D3/8 G3/8 D3/8
+# bar 12
+rh: G5/8 F5/16 E5/16~ E5/2~ E5/8. C6/16
+lh: C3/8 G3/8 D4/8 E4/8 C3/8 G3/8 B-3/8 C3/8
+# bar 13
+rh: C6/8 C6/16 C6/16~ C6/8 C6/16 C6/16 B5/4 B5/8t B5/8t A5/8t
+lh: F2/8 C3/8 F3/8 C3/8 G2/8 D3/8 G3/8 D3/8
+# bar 14
+rh: G5/8 G5/16 G5/16 G5/8t G5/8t F5/8t E5/4~ E5/8. E5/16
+lh: C3/8 G3/8 C4/8 B2/8 A2/8 E3/8 B3/8 C4/8
+# bar 15
+rh: F5/8 F5/16 F5/16~ F5/8. E5/16 D5/4 C5/8t E5/8t D5/8t
+lh: D3/8 A3/8 D4/8 A3/8 G2/8 D3/8 G3/8 B3/8
+# bar 16
+rh: C5/2. E5/8 D5/8
+lh: C3/8 G3/8 D4/8 E4/8 C2/8 G2/8 E3/8 G3/8
