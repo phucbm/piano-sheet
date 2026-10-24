@@ -14,6 +14,7 @@ Options:
   --easy         easy version: right hand exactly as played, left hand on guessed chords
                  (one per bar), chord names on top. Writes one sheet per left-hand level:
                  <out>.root / .fifth / .broken / .ballad (.musicxml, .mid, .timing.json)
+  --one-chord    with --easy: always one chord per bar, never two
   --title "..."
 """
 import argparse
@@ -33,6 +34,7 @@ p.add_argument("--half", action="store_true")
 p.add_argument("--shift", type=int, default=0)
 p.add_argument("--transpose", type=int, default=0)
 p.add_argument("--easy", action="store_true")
+p.add_argument("--one-chord", action="store_true")
 p.add_argument("--title", default="")
 a = p.parse_args()
 
@@ -98,7 +100,7 @@ spans = []  # (onset, length in 16ths, (root pitch class, "major" | "minor")), o
 if a.easy:
     # Right hand stays as played. The left hand plays a pattern (LEVELS) over chords of the
     # key guessed from every note sounding (bass note counts extra): one chord per bar,
-    # two only when the second half clearly wants another one.
+    # two only when the second half clearly wants another one (never with --one-chord).
     sounding = [(on, s["off"], m, h) for h in events for on, s in events[h].items() for m in s["pitches"]]
     end = max(off for _, off, _, _ in sounding)
     in_key = {p.pitchClass for p in k.getScale().getPitches()}
@@ -133,7 +135,7 @@ if a.easy:
     for bar in range(0, end, 16):
         w1, w2 = window(bar, 8), window(bar + 8, 8)
         g1, g2 = best(w1), best(w2)
-        if g1 and g2 and g1 != g2 and fit(w2, g2) - fit(w2, g1) > 0.5 * w2[0].sum():
+        if not a.one_chord and g1 and g2 and g1 != g2 and fit(w2, g2) - fit(w2, g1) > 0.5 * w2[0].sum():
             halves = [(bar, 8, g1), (bar + 8, 8, g2)]
         else:
             halves = [(bar, 16, best(window(bar, 16)) or prev)]

@@ -29,9 +29,10 @@ uv run python scripts/check_highlight.py output/song.musicxml  # player highligh
 `to_sheet.py` options: `--split 60` (pitch where the right hand starts), `--shift N`
 (move bar lines by N sixteenths), `--half` (slow song, tracked beat = eighth), `--transpose N`,
 `--easy` (right hand as played, left hand on guessed chords of the key, one per bar unless the
-second half clearly changes, chord names on top). It writes one sheet per left-hand level,
-`<out>.<level>.*`, easiest first: `root` (one held note), `fifth` (root + fifth held), `broken`
-(1-5-8-5 in quarters), `ballad` (1-5-8-10-8-5-8-5 in eighths).
+second half clearly changes, chord names on top; `--one-chord` keeps it to one per bar). If
+most bars change chord on beat 3, the bar lines are half a bar off: add `--shift 8`. It writes
+one sheet per left-hand level, `<out>.<level>.*`, easiest first: `root` (one held note), `fifth`
+(root + fifth held), `broken` (1-5-8-5 in quarters), `ballad` (1-5-8-10-8-5-8-5 in eighths).
 
 To add a song to the player, put `output/<name>.musicxml` and `output/<name>.timing.json`
 (both written by `to_sheet.py`) and the recording `output/<audio>.wav` in place, and add it to
